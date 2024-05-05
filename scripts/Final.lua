@@ -11,6 +11,7 @@ ToolsFile = getScriptPath().."\\".."instruments.txt"
 current_spread = 0--текущий размер спреда инструмента
 ticker = ""--тикер инструмента
 min_step = 0--шаг
+low_border_spread_to_trade = 0 -- мин спред при котором торгуем чтоб не жрать себя
 min_take = 0--тейк
 size_lot = 1--размер лота инструмента
 max_lot = 5--максимум лотов
@@ -194,7 +195,7 @@ function CreateTable()
     
     SetWindowPos(t_id, 0, 0, 290, 220)--положение и размеры окна таблицы(положение окна(x , y), ширина, высота)
 
-    for m=1, 10 do
+    for m=1, 11 do
         InsertRow(t_id, -1)
     end
 
@@ -240,6 +241,11 @@ function CreateTable()
     SetCell(t_id, 10, 1, tostring("Tool min step")); Color("Orange", t_id, 10, 1)
     SetCell(t_id, 10, 2, tostring(min_step)); Color("Orange", t_id, 10, 2)
     SetCell(t_id, 10, 3, tostring(" ")); Color("Orange", t_id, 10, 3)
+
+    --10я строка
+    SetCell(t_id, 11, 1, tostring("Low bor spr trade")); Color("Red", t_id, 11, 1)
+    SetCell(t_id, 11, 2, tostring(low_border_spread_to_trade)); Color("Red", t_id, 11, 2)
+    SetCell(t_id, 11, 3, tostring(" ")); Color("Red", t_id, 11, 3)
 
     SetTableNotificationCallback(t_id, TableMessage) -- ф-я реагирующая на мышь
 end
@@ -311,6 +317,9 @@ function FillTable()
 
     --10я строка
     SetCell(t_id, 10, 2, tostring(min_step));
+
+    --11я строка
+    SetCell(t_id, 11, 2, tostring(low_border_spread_to_trade));
 end
 
 
@@ -934,6 +943,7 @@ function main()
     LogWrite("price_step = "..price_step)
 
     min_step = tonumber((getMinStep(ticker):gsub(",", ".")))
+    low_border_spread_to_trade = min_step * 2
 
     while is_run == true do --основн цикл скрипта
         FillTable() -- зфполнение экранной таблицы

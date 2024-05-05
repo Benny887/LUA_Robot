@@ -34,7 +34,7 @@ BuyOrder_ID = 0 -- id транзакции покупки
 SellOrder_ID = 0 -- id транзакции продажи
 BuyOrder_num = 0 -- номер заявки покупной
 SellOrder_num = 0 -- номер заявки продажной
-test = 0
+dummy = 0
 
 
 offer_value_to_set = 0
@@ -108,11 +108,11 @@ function ReadTable()--получение данных из стартового 
         size_lot = math.abs(size_lot)
         LogWrite("size_lot = "..size_lot)
 
-        Comment, min_step = f:read(16, "l")
-        min_step = string.gsub(min_step, "%s+", "")
-        min_step = tonumber(min_step)
-        min_step = math.abs(min_step)
-        LogWrite("min_step = "..min_step)
+        Comment, dummy = f:read(16, "l")
+        dummy = string.gsub(dummy, "%s+", "")
+        dummy = tonumber(dummy)
+        dummy = math.abs(dummy)
+        LogWrite("dummy = "..dummy)
 
         Comment, min_take = f:read(16, "l")
         min_take = string.gsub(min_take, "%s+", "")
@@ -140,7 +140,7 @@ function SaveStart()-- сох текущ настройки торговли
     f:write("Spread limit   : "..spread_limit.."\n")
     f:write("Direction      : "..orient_trade.."\n")
     f:write("Size of lot    : "..size_lot.."\n")
-    f:write("Step           : "..min_step.."\n")
+    f:write("Dummy          : "..dummy.."\n")
     f:write("Take           : "..min_take.."\n")
     f:write("Max of lots    : "..max_lot.."\n")
 
@@ -194,7 +194,7 @@ function CreateTable()
     
     SetWindowPos(t_id, 0, 0, 290, 220)--положение и размеры окна таблицы(положение окна(x , y), ширина, высота)
 
-    for m=1, 9 do
+    for m=1, 10 do
         InsertRow(t_id, -1)
     end
 
@@ -223,8 +223,8 @@ function CreateTable()
     SetCell(t_id, 6, 3, tostring("- ")); Color("Blue", t_id, 6, 3)
 
     --7я строка
-    SetCell(t_id, 7, 1, tostring("Step")); Color("Orange", t_id, 7, 1)
-    SetCell(t_id, 7, 2, tostring(min_step)); Color("Orange", t_id, 7, 2)
+    SetCell(t_id, 7, 1, tostring("Dummy")); Color("Orange", t_id, 7, 1)
+    SetCell(t_id, 7, 2, tostring(dummy)); Color("Orange", t_id, 7, 2)
     SetCell(t_id, 7, 3, tostring("- ")); Color("Orange", t_id, 7, 3)
 
     --8я строка
@@ -235,6 +235,11 @@ function CreateTable()
     --9я строка
     Color("Yellow", t_id, 9, 1)
     Color("Blue", t_id, 9, 3)
+
+    --10я строка
+    SetCell(t_id, 10, 1, tostring("Tool min step")); Color("Orange", t_id, 10, 1)
+    SetCell(t_id, 10, 2, tostring(min_step)); Color("Orange", t_id, 10, 2)
+    SetCell(t_id, 10, 3, tostring(" ")); Color("Orange", t_id, 10, 3)
 
     SetTableNotificationCallback(t_id, TableMessage) -- ф-я реагирующая на мышь
 end
@@ -281,7 +286,7 @@ function FillTable()
     SetCell(t_id, 6, 2, tostring(max_lot));
 
     --7я строка
-    SetCell(t_id, 7, 2, tostring(min_step));
+    SetCell(t_id, 7, 2, tostring(dummy));
 
     --8я строка
     SetCell(t_id, 8, 2, tostring(min_take));
@@ -303,6 +308,9 @@ function FillTable()
     else
         SetCell(t_id, 9, 2, tostring("v Stop when 0")); Color("Yellow", t_id, 9, 2)
     end
+
+    --10я строка
+    SetCell(t_id, 10, 2, tostring(min_step));
 end
 
 
@@ -437,8 +445,8 @@ function TableMessage(t_id, msg, par1, par2) --ф-я обработки собы
 
         LogWrite("Нажата кнопка Min шаг +")
        
-        min_step = min_step + min_step_price
-        min_step = min_step - min_step%min_step_price
+        dummy = dummy + min_step_price
+        dummy = dummy - dummy%min_step_price
 
         SaveStart()
     end
@@ -448,12 +456,12 @@ function TableMessage(t_id, msg, par1, par2) --ф-я обработки собы
 
         LogWrite("Нажата кнопка Min шаг -")
 
-        min_step = min_step - min_step_price
+        dummy = dummy - min_step_price
 
-        if min_step < min_step_price then
-            min_step = min_step_price
+        if dummy < min_step_price then
+            dummy = min_step_price
         end
-        min_step = min_step - min_step%min_step_price
+        dummy = dummy - dummy%min_step_price
 
         SaveStart()
     end
@@ -925,9 +933,7 @@ function main()
     price_step=tonumber(getParamEx(class, ticker, "STEPPRICE").param_value) -- находим цену шага фьючерса
     LogWrite("price_step = "..price_step)
 
-    -- min_step = tonumber(getMinStep(ticker):gsub(",", "."))
-    -- message(min_step)
-
+    min_step = tonumber((getMinStep(ticker):gsub(",", ".")))
 
     while is_run == true do --основн цикл скрипта
         FillTable() -- зфполнение экранной таблицы

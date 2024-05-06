@@ -3,10 +3,11 @@ version = "8.0"--версия
 Name = "Robot"--заголовок таблицы
 
 depo = "NL0011100043"--торг счет срочн рынка
-class = "QJSIM"--класс инструмента
+class = ""--класс инструмента
 FileStart = getScriptPath().."\\".."start_data.txt"
 LogFile = getScriptPath().."\\".."bot_log.txt"
 ToolsFile = getScriptPath().."\\".."instruments.txt"
+ClassesFile = getScriptPath().."\\".."class codes.txt"
 
 current_spread = 0--текущий размер спреда инструмента
 ticker = ""--тикер инструмента
@@ -56,8 +57,8 @@ function split(partOfWord, inputString, separator)
 end
 
 
-function getMinStep(toolName)
-local f = io.open(ToolsFile, "r")
+function getParamFromFile(toolName, fileName)
+local f = io.open(fileName, "r")
 for line in f:lines() do
     if string.match(line, toolName) then
         min_step_loc = split("s", line, ":")
@@ -193,9 +194,9 @@ function CreateTable()
     CreateWindow(t_id)--создает таблицу
     SetWindowCaption(t_id, Name)--устан заголовок
     
-    SetWindowPos(t_id, 0, 0, 290, 220)--положение и размеры окна таблицы(положение окна(x , y), ширина, высота)
+    SetWindowPos(t_id, 0, 0, 290, 250)--положение и размеры окна таблицы(положение окна(x , y), ширина, высота)
 
-    for m=1, 11 do
+    for m=1, 12 do
         InsertRow(t_id, -1)
     end
 
@@ -242,10 +243,15 @@ function CreateTable()
     SetCell(t_id, 10, 2, tostring(min_step)); Color("Orange", t_id, 10, 2)
     SetCell(t_id, 10, 3, tostring(" ")); Color("Orange", t_id, 10, 3)
 
-    --10я строка
+    --11я строка
     SetCell(t_id, 11, 1, tostring("Low bor spr trade")); Color("Red", t_id, 11, 1)
     SetCell(t_id, 11, 2, tostring(low_border_spread_to_trade)); Color("Red", t_id, 11, 2)
     SetCell(t_id, 11, 3, tostring(" ")); Color("Red", t_id, 11, 3)
+
+    --12я строка
+    SetCell(t_id, 12, 1, tostring("Class code")); Color("Red", t_id, 12, 1)
+    SetCell(t_id, 12, 2, tostring(class)); Color("Red", t_id, 12, 2)
+    SetCell(t_id, 12, 3, tostring(" ")); Color("Red", t_id, 12, 3)
 
     SetTableNotificationCallback(t_id, TableMessage) -- ф-я реагирующая на мышь
 end
@@ -320,6 +326,9 @@ function FillTable()
 
     --11я строка
     SetCell(t_id, 11, 2, tostring(low_border_spread_to_trade));
+
+    --12я строка
+    SetCell(t_id, 12, 2, tostring(class));
 end
 
 
@@ -576,6 +585,12 @@ function StartTradeSell(current_value)
             message("Too low spread, steeeeeep = "..steeeeeep)
             return
         end
+
+        if not isAcceptableSpread() then
+            message("Incceptable spread:= "..current_value)
+            return
+        end
+
         if current_value == 0 then
             actual_offer_value1, bid_value, spred = GetStakanExtremumValues()
             if actual_offer_value1 == 0 then
@@ -614,11 +629,17 @@ end
 
 function StartTradeBuy(current_value)
     if is_run and start_bot == 1 then
-        if FindCurrentSpread(ticker, class) < spread_limit then
+        if current_spread < spread_limit then
             steeeeeep = tonumber(getParamEx(ticker, class, "SEC_PRICE_STEP").param_value)
             message("Too low spread, steeeeeep = "..steeeeeep)
             return
         end
+
+        if not isAcceptableSpread() then
+            message("Incceptable spread:= "..current_value)
+            return
+        end
+
         if current_value == 0 then
             actual_bid_value, actual_bid_value, spred = GetStakanExtremumValues()
             if actual_bid_value == 0 then
@@ -652,6 +673,10 @@ function StartTradeBuy(current_value)
     else
         message("Bot is disabled")
     end
+end
+
+function isAcceptableSpread()
+    return low_border_spread_to_trade < current_spread
 end
 
 -- function checkOffer(current_value)
@@ -722,7 +747,7 @@ function OrdersLimit(price_o, quant_o, operation_o) -- цена, количес�
             Err_Order = sendTransaction(LimitOrder)
 
             if Err_Order ~= "" then
-                LogWrite("Ошибка отправки транзакции: "..Err_Order)
+                LogWrite("Ошибка отправки транзакции: "..Err_Order, "depo = "..depo.."operation_o = "..operation_o.."ticker = "..ticker.."class = "..class.."price_o = "..price_o.."quant_o = "..quant_o.."tr_id = "..tr_id.."CLIENT_CODE = "..ticker.."-"..num_r)
             else
                 LogWrite("Транзакция отправлена")
             end
@@ -942,8 +967,9 @@ function main()
     price_step=tonumber(getParamEx(class, ticker, "STEPPRICE").param_value) -- находим цену шага фьючерса
     LogWrite("price_step = "..price_step)
 
-    min_step = tonumber((getMinStep(ticker):gsub(",", ".")))
+    min_step = tonumber((getParamFromFile(ticker, ToolsFile):gsub(",", ".")))
     low_border_spread_to_trade = min_step * 2
+    class = getParamFromFile(ticker, ClassesFile)
 
     while is_run == true do --основн цикл скрипта
         FillTable() -- зфполнение экранной таблицы

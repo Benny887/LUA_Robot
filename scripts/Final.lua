@@ -196,7 +196,7 @@ function CreateTable()
     
     SetWindowPos(t_id, 0, 0, 290, 250)--положение и размеры окна таблицы(положение окна(x , y), ширина, высота)
 
-    for m=1, 12 do
+    for m=1, 13 do
         InsertRow(t_id, -1)
     end
 
@@ -579,7 +579,6 @@ end
 
 
 function StartTradeSell(current_value)
-    limitApps = 5
     if is_run and start_bot == 1 then
         if FindCurrentSpread(ticker, class) < spread_limit then
             steeeeeep = tonumber(getParamEx(ticker, class, "SEC_PRICE_STEP").param_value)
@@ -603,7 +602,7 @@ function StartTradeSell(current_value)
             OrdersLimit(offer_value_to_set, 1, "S")
             LogWrite("start trade, actual_offer_value ="..actual_offer_value1.." set best offer value = "..offer_value_to_set.." bid_value = "..bid_value.." spred ="..spred)
             message("start trade, set best offer value = "..offer_value_to_set.." bid_value = "..bid_value.." spred ="..spred, 1)
-        elseif CountAllSellOrders() < limitApps then
+        elseif CountAllSellOrders() < max_lot then
             actual_offer_value2, bid_value, spred = GetStakanExtremumValues()
 
             LogWrite("from trade : offer_value = "..offer_value.." bid_value = "..bid_value.." spred ="..spred.." current_value ="..current_value)
@@ -632,7 +631,6 @@ function StartTradeSell(current_value)
 end
 
 function StartTradeBuy(current_value)
-    limitApps = 5
     if is_run and start_bot == 1 then
         if current_spread < spread_limit then
             steeeeeep = tonumber(getParamEx(ticker, class, "SEC_PRICE_STEP").param_value)
@@ -656,7 +654,7 @@ function StartTradeBuy(current_value)
             OrdersLimit(bid_value_to_set, 1, "B")
             LogWrite("start trade, actual_bid_value ="..actual_bid_value.." set best bid value = "..bid_value_to_set.." bid_value = "..bid_value.." spred ="..spred)
             message("start trade, set best bid value = "..bid_value_to_set.." bid_value = "..bid_value.." spred ="..spred, 1)
-        elseif CountAllBuyOrders() < limitApps then
+        elseif CountAllBuyOrders() < max_lot then
             actual_offer_value, actual_bid_value, spred = GetStakanExtremumValues()
 
             LogWrite("from trade : offer_value = "..offer_value.." bid_value = "..bid_value.." spred ="..spred.." current_value ="..current_value)
@@ -831,6 +829,35 @@ function OrdersLimit(price_o, quant_o, operation_o) -- цена, количес�
     end
 
 end
+
+
+function KillLastOrder()
+    tran_id = tostring(math.floor(1000*os.clock()))
+
+    last_order = getNumberOf("orders") - 1
+
+    order = getItem("orders", last_order).order_num
+
+    LogWrite(LogWrite("Удаляем заявку "..tr_id .."с номером = "..order))
+
+    local killAllOrder = {
+                    ["ACTION"]="KILL_ORDER",
+                    ["CLASSCODE"]=class,
+                    ["SECCODE"]=ticker,
+                    ["ORDER_KEY"]=tostring(math.ceil(order)),
+                    ["ACCOUNT"]= depo,		
+                    ["TRANS_ID"]=tran_id,
+                         }
+    local res = sendTransaction(killAllOrder)
+    if res ~= "" then
+        LogWrite("Error while sending order removing transaction: "..res) 
+    else 
+        LogWrite("Order removing transaction sent")
+    end
+
+end
+
+
 
 -- function KillOrderSell()--снятие всех заявок
 --     local orderCloseAll = {} --созд табл для записи в нее парам-в выставл заявки
@@ -1058,8 +1085,8 @@ function main()
                 else
                     StartTradeSell(offer_value_to_set)
                     StartTradeBuy(bid_value_to_set)
+                end
             end
-        end
 
         if IsWindowClosed(t_id) then
             LogWrite("Окно закрыто")

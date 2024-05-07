@@ -579,6 +579,7 @@ end
 
 
 function StartTradeSell(current_value)
+    limitApps = 5
     if is_run and start_bot == 1 then
         if FindCurrentSpread(ticker, class) < spread_limit then
             steeeeeep = tonumber(getParamEx(ticker, class, "SEC_PRICE_STEP").param_value)
@@ -602,7 +603,7 @@ function StartTradeSell(current_value)
             OrdersLimit(offer_value_to_set, 1, "S")
             LogWrite("start trade, actual_offer_value ="..actual_offer_value1.." set best offer value = "..offer_value_to_set.." bid_value = "..bid_value.." spred ="..spred)
             message("start trade, set best offer value = "..offer_value_to_set.." bid_value = "..bid_value.." spred ="..spred, 1)
-        else
+        elseif CountAllSellOrders() < limitApps then
             actual_offer_value2, bid_value, spred = GetStakanExtremumValues()
 
             LogWrite("from trade : offer_value = "..offer_value.." bid_value = "..bid_value.." spred ="..spred.." current_value ="..current_value)
@@ -620,6 +621,9 @@ function StartTradeSell(current_value)
                 OrdersLimit(offer_value_to_set, 1, "S")
                 message("actual_offer_value2 = "..actual_offer_value2.." is equals or greater than current_value = "..current_value, 3)
             end
+        else
+            message("Already 5 applies !")    
+            sleep(500)
         end
         
     else
@@ -628,6 +632,7 @@ function StartTradeSell(current_value)
 end
 
 function StartTradeBuy(current_value)
+    limitApps = 5
     if is_run and start_bot == 1 then
         if current_spread < spread_limit then
             steeeeeep = tonumber(getParamEx(ticker, class, "SEC_PRICE_STEP").param_value)
@@ -651,12 +656,12 @@ function StartTradeBuy(current_value)
             OrdersLimit(bid_value_to_set, 1, "B")
             LogWrite("start trade, actual_bid_value ="..actual_bid_value.." set best bid value = "..bid_value_to_set.." bid_value = "..bid_value.." spred ="..spred)
             message("start trade, set best bid value = "..bid_value_to_set.." bid_value = "..bid_value.." spred ="..spred, 1)
-        else
+        elseif CountAllBuyOrders() < limitApps then
             actual_offer_value, actual_bid_value, spred = GetStakanExtremumValues()
 
             LogWrite("from trade : offer_value = "..offer_value.." bid_value = "..bid_value.." spred ="..spred.." current_value ="..current_value)
 
-            if actual_bid_value ~= 0 and (actual_bid_value ~= current_value) and is_run then
+            if actual_bid_value ~= 0 and (actual_bid_value ~= current_value) and is_run then 
                 bid_value_to_set = actual_bid_value + min_step
                 OrdersLimit(bid_value_to_set, 1, "B")
                 message("bit current price: actual_bid_value "..actual_bid_value.." > current_value "..current_value.."bid greater price : "..bid_value_to_set, 2)
@@ -668,7 +673,10 @@ function StartTradeBuy(current_value)
                 bid_value_to_set = actual_bid_value + min_step
                 OrdersLimit(bid_value_to_set, 1, "B")
                 message("actual_bid_value = "..actual_bid_value.."is equals or less than current_value = "..current_value, 3)
-            end    
+            end
+        else
+            message("Already 5 applies !")    
+            sleep(500)       
         end
     else
         message("Bot is disabled")
@@ -679,16 +687,83 @@ function isAcceptableSpread()
     return low_border_spread_to_trade < current_spread
 end
 
--- function checkOffer(current_value)
---     offer_value, bid_value, spred = GetStakanExtremumValues()
 
---     LogWrite("from checkOffer: current_value= "..current_value.."offer_value = "..offer_value.." bid_value = "..bid_value.." spred ="..spred)
+function CountAllBuyOrders()
+    LogWrite("Count active buy orders")
+    num_orders = getNumberOf("orders")
 
---     if current_value < offer_value then
---         StartTrade(offer_value)
---         message("current_value < offer_value", 4)
---     end
--- end
+    scan_max_limit = 100
+    scan_limit = 0
+    if num_orders > 100 then
+        scan_limit = num_orders - scan_max_limit   
+    end
+    
+	num_active_buy_order = 0
+
+    LogWrite("Start job at "..getInfoParam("SERVERTIME"))
+	
+	for i = num_orders - 1, scan_limit, -1 do
+		
+		myorder = getItem("orders", i)
+
+		if bit.band(tonumber(myorder["flags"]), 1) > 0 and bit.band(tonumber(myorder["flags"]), 4) == 0 then 
+			num_active_buy_order = num_active_buy_order + 1
+		end
+		
+		sleep(10)
+		
+	end
+
+    LogWrite("Finish job at "..getInfoParam("SERVERTIME"))
+	
+    LogWrite("Количество активных заявок на покупку "..num_active_buy_order)
+
+    return num_active_buy_order
+end
+
+function CountAllSellOrders()
+    LogWrite("Count active sell orders")
+    num_orders = getNumberOf("orders")
+
+    scan_max_limit = 100
+    scan_limit = 0
+    if num_orders > 100 then
+        scan_limit = num_orders - scan_max_limit   
+    end
+    
+	num_active_sell_order = 0
+
+    LogWrite("Start job at "..getInfoParam("SERVERTIME"))
+	
+	for i = num_orders - 1, scan_limit, -1 do
+		
+		myorder = getItem("orders", i)
+
+		if bit.band(tonumber(myorder["flags"]), 1) > 0 and bit.band(tonumber(myorder["flags"]), 4) > 0 then 
+			num_active_sell_order = num_active_sell_order + 1
+		end
+		
+		sleep(10)
+		
+	end
+
+    LogWrite("Finish job at "..getInfoParam("SERVERTIME"))
+	
+    LogWrite("Количество активных заявок на продажу "..num_active_sell_order)
+    return num_active_sell_order
+end
+
+
+function checkOffer(current_value)
+    offer_value, bid_value, spred = GetStakanExtremumValues()
+
+    LogWrite("from checkOffer: current_value= "..current_value.."offer_value = "..offer_value.." bid_value = "..bid_value.." spred ="..spred)
+
+    if current_value < offer_value then
+        StartTrade(offer_value)
+        message("current_value < offer_value", 4)
+    end
+end
 
 
 function GetStakanExtremumValues ()
@@ -749,7 +824,7 @@ function OrdersLimit(price_o, quant_o, operation_o) -- цена, количес�
             if Err_Order ~= "" then
                 LogWrite("Ошибка отправки транзакции: "..Err_Order, "depo = "..depo.."operation_o = "..operation_o.."ticker = "..ticker.."class = "..class.."price_o = "..price_o.."quant_o = "..quant_o.."tr_id = "..tr_id.."CLIENT_CODE = "..ticker.."-"..num_r)
             else
-                LogWrite("Транзакция отправлена")
+                LogWrite("Транзакция отправлена: ".."depo = "..depo.."operation_o = "..operation_o.."ticker = "..ticker.."class = "..class.."price_o = "..price_o.."quant_o = "..quant_o.."tr_id = "..tr_id.."CLIENT_CODE = "..ticker.."-"..num_r)
             end
     else
         message("Ошибка определения ценового лимита. Заявка не выставлена.", 0)

@@ -113,15 +113,15 @@
 
 -- LogFile = getScriptPath().."\\".."bot_log.txt"
 
--- function LogWrite(str)--логгирование
---     if not lf then
---        lf = io.open(LogFile, "a")
---     end
+function LogWrite(str)--логгирование
+    if not lf then
+       lf = io.open(LogFile, "a")
+    end
 
---       lf:write(tostring(str).."\n")    
+      lf:write(tostring(str).."\n")    
 
---     lf:flush()
--- end
+    lf:flush()
+end
 
 -- function main()
 
@@ -232,9 +232,48 @@
 
 
 
+
+
+
+
+
+
+
+--КОЛИЧЕСТВО ТЕКУЩИХ ПОЗИЦИЙ
+
+
+function split(partOfWord, inputString, separator)
+    if partOfWord == "f" then
+        local sepIndex = string.find(inputString, separator)
+        local result = string.sub(0, sepIndex)
+        return result
+    else
+        local sepIndex = string.find(inputString, separator) + 1
+        local result = string.sub(inputString, sepIndex)
+        return result
+    end
+end
+
+function getParamFromFile(toolName, fileName)
+    local f = io.open(fileName, "r")
+    for line in f:lines() do
+        if string.match(line, toolName) then
+            min_step_loc = split("s", line, ":")
+            return min_step_loc
+        end
+    end
+    f:close()
+    end
+
+
 -- currentpos	NUMBER	Текущий остаток
 
 -- account_positions  = orders
+
+LogFile = getScriptPath().."\\".."bot_log.txt"
+
+
+ticker = "EuM4"
 
 function main()
     -- account_positions = getNumberOf("account_positions") 
@@ -248,17 +287,79 @@ function main()
 
     -- currentpos = getItem("firm_holding", 1)
 
-    number = getNumberOf("account_positions")
+    -- number = getNumberOf("futures_client_holding") -- колич записей таблицы фьючерсов
 
-    message(" number = "..number.currentpos)
+    -- message(" number = "..number)
     -- LogWrite(" currentpos = "..currentpos)
+
+    -- sec_code = getItem("futures_client_holding", 0).sec_code --поллучить параметр sec_code(назв инстр) из таблицы фьчерсов
+    -- openbuys = getItem("futures_client_holding", 0).openbuys -- 	Активные на покупку
+    -- message(" openbuys = "..openbuys)
+    -- opensells = getItem("futures_client_holding", 0).opensells -- 	Активные на покупку
+    -- message(" openbuys = "..opensells)
+                    -- totalnet = getItem("futures_client_holding", 0).totalnet -- 	currentpos
+                    -- message(" totalnet = "..math.abs(totalnet))
+
+
+--     securities = getNumberOf("securities")
+-- LogWrite(" securities = "..securities)
+-- trade_accounts = getNumberOf("trade_accounts")
+-- LogWrite(" trade_accounts = "..trade_accounts)
+-- client_codes = getNumberOf("client_codes")
+-- LogWrite(" client_codes = "..client_codes)
+-- all_trades = getNumberOf("all_trades")
+-- LogWrite(" all_trades = "..all_trades)
+-- account_positions = getNumberOf("account_positions")
+-- LogWrite(" account_positions = "..account_positions)
+-- orders = getNumberOf("orders")
+-- LogWrite(" orders = "..orders)
+-- futures_client_holding = getNumberOf("futures_client_holding")
+-- LogWrite(" futures_client_holding = "..futures_client_holding)
+-- futures_client_limits = getNumberOf("futures_client_limits")
+-- LogWrite(" futures_client_limits = "..futures_client_limits)
+-- money_limits = getNumberOf("money_limits")
+-- LogWrite(" money_limits = "..money_limits)
+-- depo_limits = getNumberOf("depo_limits")
+-- LogWrite(" depo_limits = "..depo_limits)
+-- trades = getNumberOf("trades")
+-- LogWrite(" trades = "..trades)
+-- stop_orders = getNumberOf("stop_orders")
+-- LogWrite(" stop_orders = "..stop_orders)
+-- neg_deals = getNumberOf("neg_deals")
+-- LogWrite(" neg_deals = "..neg_deals)
+-- neg_trades = getNumberOf("neg_trades")
+-- LogWrite(" neg_trades = "..neg_trades)
+-- neg_deal_reports = getNumberOf("neg_deal_reports")
+-- LogWrite(" neg_deal_reports = "..neg_deal_reports)
+-- firm_holding = getNumberOf("firm_holding")
+-- LogWrite(" firm_holding = "..firm_holding)
+-- account_balance = getNumberOf("account_balance")
+-- LogWrite(" account_balance = "..account_balance)
+-- ccp_holdings = getNumberOf("ccp_holdings")
+-- LogWrite(" ccp_holdings = "..ccp_holdings)
+-- rm_holdings = getNumberOf("rm_holdings")
+
+message(countCurrentPositions(ticker))
+
 
 end
 
 
 
+InstrumentTypesFile = getScriptPath().."\\".."instrument type.txt"
 
 
+function countCurrentPositions(ticker)
+    LogWrite("Count active current positions")
+    local totalnet = 0
+
+    if getParamFromFile(ticker, InstrumentTypesFile) == "futures" then
+        totalnet = getItem("futures_client_holding", 0).totalnet
+    end
+    
+    LogWrite("Count active current positions = "..totalnet)
+    return math.abs(totalnet)
+end
 
 
 

@@ -8,14 +8,15 @@ FileStart = getScriptPath().."\\".."start_data.txt"
 LogFile = getScriptPath().."\\".."bot_log.txt"
 ToolsFile = getScriptPath().."\\".."instruments.txt"
 ClassesFile = getScriptPath().."\\".."class codes.txt"
+InstrumentTypesFile = getScriptPath().."\\".."instrument type.txt"
 
 current_spread = 0--текущий размер спреда инструмента
 ticker = ""--тикер инструмента
 min_step = 0--шаг
 low_border_spread_to_trade = 0 -- мин спред при котором торгуем чтоб не жрать себя
 min_take = 0--тейк
-size_lot = 1--размер лота инструмента
-max_lot = 5--максимум лотов
+size_lot = 1-- максимальное количество заявок инструмента
+max_pos = 5--максимум позиций
 spread_limit = 0--текущий спред
 orient_trade = 0--направление торговли: -1 -sell, 0- sell+buy, 1- buy
 stop_on = 0-- если один то стоп при 0
@@ -37,6 +38,11 @@ SellOrder_ID = 0 -- id транзакции продажи
 BuyOrder_num = 0 -- номер заявки покупной
 SellOrder_num = 0 -- номер заявки продажной
 dummy = 0
+last_operation = ""
+num_active_sell_order = 0
+num_active_buy_order = 0
+buyAppNumberToRemove = 0
+sellAppNumberToRemove = 0
 
 
 offer_value_to_set = 0
@@ -58,14 +64,16 @@ end
 
 
 function getParamFromFile(toolName, fileName)
+LogWrite("getParamFromFile method start: ticker = "..toolName)
 local f = io.open(fileName, "r")
 for line in f:lines() do
     if string.match(line, toolName) then
         min_step_loc = split("s", line, ":")
+        f:close()
+        LogWrite("getParamFromFile method finish: min_step_loc = "..min_step_loc)
         return min_step_loc
     end
 end
-f:close()
 end
 
 
@@ -122,11 +130,11 @@ function ReadTable()--получение данных из стартового 
         min_take = math.abs(min_take)
         LogWrite("min_take = "..min_take)
 
-        Comment, max_lot = f:read(16, "l")
-        max_lot = string.gsub(max_lot, "%s+", "")
-        max_lot = tonumber(max_lot)
-        max_lot = math.abs(max_lot)
-        LogWrite("max_lot = "..max_lot)
+        Comment, max_pos = f:read(16, "l")
+        max_pos = string.gsub(max_pos, "%s+", "")
+        max_pos = tonumber(max_pos)
+        max_pos = math.abs(max_pos)
+        LogWrite("max_pos = "..max_pos)
 
         f:close()
     else
@@ -144,7 +152,7 @@ function SaveStart()-- сох текущ настройки торговли
     f:write("Size of lot    : "..size_lot.."\n")
     f:write("Dummy          : "..dummy.."\n")
     f:write("Take           : "..min_take.."\n")
-    f:write("Max of lots    : "..max_lot.."\n")
+    f:write("Max of pos     : "..max_pos.."\n")
 
     f:close()
 end
@@ -220,8 +228,8 @@ function CreateTable()
     SetCell(t_id, 5, 3, tostring("- ")); Color("Blue", t_id, 5, 3)
 
     --6я строка
-    SetCell(t_id, 6, 1, tostring("Max of lots")); Color("Blue", t_id, 6, 1)
-    SetCell(t_id, 6, 2, tostring(max_lot)); Color("Blue", t_id, 6, 2)
+    SetCell(t_id, 6, 1, tostring("Max of pos")); Color("Blue", t_id, 6, 1)
+    SetCell(t_id, 6, 2, tostring(max_pos)); Color("Blue", t_id, 6, 2)
     SetCell(t_id, 6, 3, tostring("- ")); Color("Blue", t_id, 6, 3)
 
     --7я строка
@@ -295,7 +303,12 @@ function FillTable()
     SetCell(t_id, 5, 2, tostring(size_lot));
 
     --6я строка
-    SetCell(t_id, 6, 2, tostring(max_lot));
+    if max_pos == 20 then
+        SetCell(t_id, 6, 2, tostring("0"));
+    else
+        SetCell(t_id, 6, 2, tostring(max_pos));
+    end
+    
 
     --7я строка
     SetCell(t_id, 7, 2, tostring(dummy));
@@ -409,8 +422,8 @@ function TableMessage(t_id, msg, par1, par2) --ф-я обработки собы
 
         size_lot = size_lot + 1
         size_lot = math.ceil(size_lot)
-        if size_lot > max_lot then
-            size_lot = math.floor(max_lot)
+        if size_lot > max_pos then
+            size_lot = math.floor(max_pos)
         end
 
         SaveStart()
@@ -432,13 +445,19 @@ function TableMessage(t_id, msg, par1, par2) --ф-я обработки собы
     end
 
 
-    --если нажата кнопка Max lot +
+    --если нажата кнопка Max pos +
     if msg == QTABLE_LBUTTONDOWN and par1 == 6 and par2 == 2 and start_bot == 0 then
 
         LogWrite("Нажата кнопка Max lot +")
 
-        max_lot = max_lot + 1
-        max_lot = math.ceil(max_lot)
+        max_pos = max_pos + 1
+        max_pos = math.ceil(max_pos)
+        
+        if max_pos == 21 then
+            max_pos = 1
+        elseif max_pos > 5 then
+            max_pos = 5   
+        end
 
         SaveStart()
     end
@@ -448,11 +467,12 @@ function TableMessage(t_id, msg, par1, par2) --ф-я обработки собы
 
         LogWrite("Нажата кнопка Max lot +")
 
-        max_lot = max_lot - 1
-        if size_lot > max_lot then
-            max_lot = size_lot
+        max_pos = max_pos - 1
+        max_pos = math.ceil(max_pos)
+
+        if max_pos == 0 or max_pos == 19 then
+            max_pos = 20 
         end
-        max_lot = math.ceil(max_lot)
 
         SaveStart()
     end
@@ -583,11 +603,13 @@ function StartTradeSell(current_value)
         if FindCurrentSpread(ticker, class) < spread_limit then
             steeeeeep = tonumber(getParamEx(ticker, class, "SEC_PRICE_STEP").param_value)
             message("Too low spread, steeeeeep = "..steeeeeep)
+            LogWrite("Too low spread for sell operation, step = "..steeeeeep)
             return
         end
 
         if not isAcceptableSpread() then
             message("Incceptable spread:= "..current_value)
+            LogWrite("Incceptable spread for sell operation: "..current_value)
             return
         end
 
@@ -598,31 +620,31 @@ function StartTradeSell(current_value)
                 start_bot = 0
                 return
             end
-            offer_value_to_set = actual_offer_value1 - min_step
+            offer_value_to_set = math.ceil(actual_offer_value1 - min_step) --math.ceil( если с фьючерсами
+            
             OrdersLimit(offer_value_to_set, 1, "S")
             LogWrite("start trade, actual_offer_value ="..actual_offer_value1.." set best offer value = "..offer_value_to_set.." bid_value = "..bid_value.." spred ="..spred)
             message("start trade, set best offer value = "..offer_value_to_set.." bid_value = "..bid_value.." spred ="..spred, 1)
-        elseif CountAllSellOrders() < max_lot then
-            actual_offer_value2, bid_value, spred = GetStakanExtremumValues()
+        else --countCurrentPositions(ticker)  < max_pos  когда будем работать с позициями) (CountAllSellOrders(ticker) < size_lot - если нужно ограничение по заявкам )
+            actual_offer_value, bid_value, spred = GetStakanExtremumValues()
+            CountSellOrdersByTool(ticker)
+            LogWrite("from trade : actual_offer_value = "..actual_offer_value.." bid_value = "..bid_value.." spred ="..spred.." current_value ="..current_value)--  num of positions "..countCurrentPositions(ticker).." < "..max_pos.."  при участи позиций
 
-            LogWrite("from trade : offer_value = "..offer_value.." bid_value = "..bid_value.." spred ="..spred.." current_value ="..current_value)
-
-            if actual_offer_value2 ~= 0 and (actual_offer_value2 ~= current_value) and is_run then
-                offer_value_to_set = actual_offer_value2 - min_step
+            if actual_offer_value ~= 0 and (actual_offer_value ~= current_value) and is_run then
+                offer_value_to_set = math.ceil(actual_offer_value - min_step)--math.ceil(
+                KillLastOrderByType("S")
                 OrdersLimit(offer_value_to_set, 1, "S")
-                message("bit current price: actual_offer_value "..actual_offer_value2.." > current_value "..current_value.."offer less price : "..offer_value_to_set, 2)
-                LogWrite("bit current price: actual_offer_value "..actual_offer_value2.." > current_value "..current_value.."offer less price : "..offer_value_to_set)
-            elseif actual_offer_value2 == 0 then
+                message("bit current price: actual_offer_value "..actual_offer_value.." > current_value "..current_value.."offer less price : "..offer_value_to_set, 2)
+                LogWrite("bit current price: actual_offer_value "..actual_offer_value.." > current_value "..current_value.."offer less price : "..offer_value_to_set)
+            elseif actual_offer_value == 0 then
                 message("actual_offer_value is nil", 3)
                 start_bot = 0
             elseif current_value ~= 0 then
-                offer_value_to_set = actual_offer_value2 - min_step
-                OrdersLimit(offer_value_to_set, 1, "S")
-                message("actual_offer_value2 = "..actual_offer_value2.." is equals or greater than current_value = "..current_value, 3)
+                message("actual_offer_value = "..actual_offer_value.." is equals or greater than current_value = "..current_value, 3)
             end
-        else
-            message("Already 5 applies !")    
-            sleep(500)
+        -- else
+        --     message("Positions limit - "..max_pos.." is reached! ")    
+        --     sleep(500)
         end
         
     else
@@ -634,12 +656,14 @@ function StartTradeBuy(current_value)
     if is_run and start_bot == 1 then
         if current_spread < spread_limit then
             steeeeeep = tonumber(getParamEx(ticker, class, "SEC_PRICE_STEP").param_value)
+            LogWrite("Too low spread for buy operation, step = "..steeeeeep)
             message("Too low spread, steeeeeep = "..steeeeeep)
             return
         end
 
         if not isAcceptableSpread() then
-            message("Incceptable spread:= "..current_value)
+            message("Incceptable spread : "..current_value)
+            LogWrite("Incceptable spread for buy operation: "..current_value)
             return
         end
 
@@ -650,17 +674,18 @@ function StartTradeBuy(current_value)
                 start_bot = 0
                 return
             end
-            bid_value_to_set = actual_bid_value + min_step
+            bid_value_to_set = math.ceil(actual_bid_value + min_step)--math.ceil(
             OrdersLimit(bid_value_to_set, 1, "B")
             LogWrite("start trade, actual_bid_value ="..actual_bid_value.." set best bid value = "..bid_value_to_set.." bid_value = "..bid_value.." spred ="..spred)
             message("start trade, set best bid value = "..bid_value_to_set.." bid_value = "..bid_value.." spred ="..spred, 1)
-        elseif CountAllBuyOrders() < max_lot then
+        else -- (countCurrentPositions(ticker) < max_pos  когда будем работать с позициями) (CountAllBuyOrders(ticker) < size_lot then - если нужно ограничение по заявкам)
             actual_offer_value, actual_bid_value, spred = GetStakanExtremumValues()
-
-            LogWrite("from trade : offer_value = "..offer_value.." bid_value = "..bid_value.." spred ="..spred.." current_value ="..current_value)
+            CountBuyOrdersByTool(ticker)
+            LogWrite("from trade : actual_offer_value = "..actual_offer_value.." actual_bid_value = "..actual_bid_value.." spred ="..spred.." current_value ="..current_value) --num of positions "..countCurrentPositions(ticker).." < "..max_pos..", - при учстии позиций
 
             if actual_bid_value ~= 0 and (actual_bid_value ~= current_value) and is_run then 
-                bid_value_to_set = actual_bid_value + min_step
+                bid_value_to_set = math.ceil(actual_bid_value + min_step)--math.ceil(
+                KillLastOrderByType("B")
                 OrdersLimit(bid_value_to_set, 1, "B")
                 message("bit current price: actual_bid_value "..actual_bid_value.." > current_value "..current_value.."bid greater price : "..bid_value_to_set, 2)
                 LogWrite("bit current price: actual_bid_value "..actual_bid_value.." > current_value "..current_value.."bid greater price : "..bid_value_to_set)
@@ -668,13 +693,11 @@ function StartTradeBuy(current_value)
                 message("actual_bid_value is nil", 3)
                 start_bot = 0
             elseif current_value ~= 0 then
-                bid_value_to_set = actual_bid_value + min_step
-                OrdersLimit(bid_value_to_set, 1, "B")
                 message("actual_bid_value = "..actual_bid_value.."is equals or less than current_value = "..current_value, 3)
             end
-        else
-            message("Already 5 applies !")    
-            sleep(500)       
+        -- else
+        --     message("Positions limit - "..max_pos.." is reached! ")    
+        --     sleep(500)       
         end
     else
         message("Bot is disabled")
@@ -686,7 +709,22 @@ function isAcceptableSpread()
 end
 
 
-function CountAllBuyOrders()
+function countCurrentPositions(ticker)
+    LogWrite("Count active current positions method start")
+    local totalnet = 0
+
+    if getParamFromFile(ticker, InstrumentTypesFile) == "futures" then
+        totalnet = getItem("futures_client_holding", 0).totalnet
+    end
+    
+    LogWrite("Count active current positions = "..totalnet)
+    return math.abs(totalnet)
+end
+
+
+
+function CountBuyOrdersByTool(ticker)
+    num_active_buy_order = 0
     LogWrite("Count active buy orders")
     num_orders = getNumberOf("orders")
 
@@ -695,8 +733,6 @@ function CountAllBuyOrders()
     if num_orders > 100 then
         scan_limit = num_orders - scan_max_limit   
     end
-    
-	num_active_buy_order = 0
 
     LogWrite("Start job at "..getInfoParam("SERVERTIME"))
 	
@@ -704,8 +740,9 @@ function CountAllBuyOrders()
 		
 		myorder = getItem("orders", i)
 
-		if bit.band(tonumber(myorder["flags"]), 1) > 0 and bit.band(tonumber(myorder["flags"]), 4) == 0 then 
+		if bit.band(tonumber(myorder["flags"]), 1) > 0 and bit.band(tonumber(myorder["flags"]), 4) == 0 and myorder.sec_code == ticker then 
 			num_active_buy_order = num_active_buy_order + 1
+            buyAppNumberToRemove = myorder.order_num
 		end
 		
 		sleep(10)
@@ -716,10 +753,11 @@ function CountAllBuyOrders()
 	
     LogWrite("Количество активных заявок на покупку "..num_active_buy_order)
 
-    return num_active_buy_order
+    -- return num_active_buy_order
 end
 
-function CountAllSellOrders()
+function CountSellOrdersByTool(ticker)
+    num_active_sell_order = 0
     LogWrite("Count active sell orders")
     num_orders = getNumberOf("orders")
 
@@ -728,8 +766,6 @@ function CountAllSellOrders()
     if num_orders > 100 then
         scan_limit = num_orders - scan_max_limit   
     end
-    
-	num_active_sell_order = 0
 
     LogWrite("Start job at "..getInfoParam("SERVERTIME"))
 	
@@ -737,8 +773,9 @@ function CountAllSellOrders()
 		
 		myorder = getItem("orders", i)
 
-		if bit.band(tonumber(myorder["flags"]), 1) > 0 and bit.band(tonumber(myorder["flags"]), 4) > 0 then 
+		if bit.band(tonumber(myorder["flags"]), 1) > 0 and bit.band(tonumber(myorder["flags"]), 4) > 0 and myorder.sec_code == ticker then 
 			num_active_sell_order = num_active_sell_order + 1
+            sellAppNumberToRemove = myorder.order_num
 		end
 		
 		sleep(10)
@@ -748,8 +785,75 @@ function CountAllSellOrders()
     LogWrite("Finish job at "..getInfoParam("SERVERTIME"))
 	
     LogWrite("Количество активных заявок на продажу "..num_active_sell_order)
-    return num_active_sell_order
+    
+    -- return num_active_sell_order
 end
+
+
+-- function CountAllBuyOrders()
+--     LogWrite("Count active buy orders")
+--     num_orders = getNumberOf("orders")
+
+--     scan_max_limit = 100
+--     scan_limit = 0
+--     if num_orders > 100 then
+--         scan_limit = num_orders - scan_max_limit   
+--     end
+
+--     LogWrite("Start job at "..getInfoParam("SERVERTIME"))
+	
+-- 	for i = num_orders - 1, scan_limit, -1 do
+		
+-- 		myorder = getItem("orders", i)
+
+-- 		if bit.band(tonumber(myorder["flags"]), 1) > 0 and bit.band(tonumber(myorder["flags"]), 4) == 0 then 
+-- 			num_active_buy_order = num_active_buy_order + 1
+-- 		end
+		
+-- 		sleep(10)
+		
+-- 	end
+
+--     LogWrite("Finish job at "..getInfoParam("SERVERTIME"))
+	
+--     LogWrite("Количество активных заявок на покупку "..num_active_buy_order)
+
+--     return num_active_buy_order
+-- end
+
+-- function CountAllSellOrders()
+--     LogWrite("Count active sell orders")
+--     num_orders = getNumberOf("orders")
+
+--     scan_max_limit = 100
+--     scan_limit = 0
+--     if num_orders > 100 then
+--         scan_limit = num_orders - scan_max_limit   
+--     end
+
+--     LogWrite("Start job at "..getInfoParam("SERVERTIME"))
+	
+-- 	for i = num_orders - 1, scan_limit, -1 do
+		
+-- 		myorder = getItem("orders", i)
+
+-- 		if bit.band(tonumber(myorder["flags"]), 1) > 0 and bit.band(tonumber(myorder["flags"]), 4) > 0 then 
+-- 			num_active_sell_order = num_active_sell_order + 1
+-- 		end
+		
+-- 		sleep(10)
+		
+-- 	end
+
+--     LogWrite("Finish job at "..getInfoParam("SERVERTIME"))
+	
+--     LogWrite("Количество активных заявок на продажу "..num_active_sell_order)
+    
+--     return num_active_sell_order
+-- end
+
+
+
 
 
 function checkOffer(current_value)
@@ -822,7 +926,9 @@ function OrdersLimit(price_o, quant_o, operation_o) -- цена, количес�
             if Err_Order ~= "" then
                 LogWrite("Ошибка отправки транзакции: "..Err_Order, "depo = "..depo.."operation_o = "..operation_o.."ticker = "..ticker.."class = "..class.."price_o = "..price_o.."quant_o = "..quant_o.."tr_id = "..tr_id.."CLIENT_CODE = "..ticker.."-"..num_r)
             else
+                last_operation = operation_o
                 LogWrite("Транзакция отправлена: ".."depo = "..depo.."operation_o = "..operation_o.."ticker = "..ticker.."class = "..class.."price_o = "..price_o.."quant_o = "..quant_o.."tr_id = "..tr_id.."CLIENT_CODE = "..ticker.."-"..num_r)
+                sleep(10)
             end
     else
         message("Ошибка определения ценового лимита. Заявка не выставлена.", 0)
@@ -831,20 +937,26 @@ function OrdersLimit(price_o, quant_o, operation_o) -- цена, количес�
 end
 
 
-function KillLastOrder()
+function KillLastOrderByType(src_operation)--src_operation - операция для которой делаем предудаление перед более лучшим выствалением цены
+    LogWrite("Trying to kill last order "..src_operation)
     tran_id = tostring(math.floor(1000*os.clock()))
 
-    last_order = getNumberOf("orders") - 1
+    if (src_operation == "B" and num_active_buy_order == 0)  or (src_operation == "S" and num_active_sell_order == 0) then
+        LogWrite("Unable to kill last order "..src_operation..": num_active_buy_order = "..num_active_buy_order.."; num_active_sell_order = "..num_active_sell_order.." last_operation = "..last_operation)
+        return
+    end
 
-    order = getItem("orders", last_order).order_num
+    -- order = getItem("orders", last_order).order_num
 
-    LogWrite(LogWrite("Удаляем заявку "..tr_id .."с номером = "..order))
+    local orderToKill = src_operation == "B" and buyAppNumberToRemove or sellAppNumberToRemove
+
+    LogWrite(LogWrite("Удаляем заявку "..tr_id .."с номером = "..orderToKill))
 
     local killAllOrder = {
                     ["ACTION"]="KILL_ORDER",
                     ["CLASSCODE"]=class,
                     ["SECCODE"]=ticker,
-                    ["ORDER_KEY"]=tostring(math.ceil(order)),
+                    ["ORDER_KEY"]=tostring(orderToKill),
                     ["ACCOUNT"]= depo,		
                     ["TRANS_ID"]=tran_id,
                          }
@@ -855,6 +967,11 @@ function KillLastOrder()
         LogWrite("Order removing transaction sent")
     end
 
+end
+
+function killLastBuySellOrders()
+    KillLastOrderByType("B")
+    KillLastOrderByType("S")
 end
 
 

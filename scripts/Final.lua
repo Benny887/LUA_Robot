@@ -375,7 +375,7 @@ function TableMessage(t_id, msg, par1, par2) --ф-я обработки собы
 
         LogWrite("Нажата кнопка Spread limit +")
 
-        spread_limit = spread_limit + 0.01
+        spread_limit = spread_limit + min_step
         SaveStart()
     end
 
@@ -384,7 +384,7 @@ function TableMessage(t_id, msg, par1, par2) --ф-я обработки собы
 
         LogWrite("Нажата кнопка Spread limit -")
 
-        spread_limit = spread_limit - 0.01
+        spread_limit = spread_limit - min_step
         SaveStart()
     end
 
@@ -640,7 +640,7 @@ function StartTradeSell(current_value)
                 message("actual_offer_value is nil", 3)
                 start_bot = 0
             elseif current_value ~= 0 then
-                message("actual_offer_value = "..actual_offer_value.." is equals or greater than current_value = "..current_value, 3)
+                message("actual_offer_value = "..actual_offer_value.." is equals or greater than current_value = "..current_value.."countCurrentPositions = "..countCurrentPositions(ticker), 3)
             end
         -- else
         --     message("Positions limit - "..max_pos.." is reached! ")    
@@ -693,7 +693,8 @@ function StartTradeBuy(current_value)
                 message("actual_bid_value is nil", 3)
                 start_bot = 0
             elseif current_value ~= 0 then
-                message("actual_bid_value = "..actual_bid_value.."is equals or less than current_value = "..current_value, 3)
+
+                message("actual_bid_value = "..actual_bid_value.."is equals or less than current_value = "..current_value.."countCurrentPositions = "..countCurrentPositions(ticker), 3)
             end
         -- else
         --     message("Positions limit - "..max_pos.." is reached! ")    
@@ -710,15 +711,26 @@ end
 
 
 function countCurrentPositions(ticker)
-    LogWrite("Count active current positions method start")
+    LogWrite("Count active current positions start")
     local totalnet = 0
 
-    if getParamFromFile(ticker, InstrumentTypesFile) == "futures" then
-        totalnet = getItem("futures_client_holding", 0).totalnet
-    end
-    
-    LogWrite("Count active current positions = "..totalnet)
-    return math.abs(totalnet)
+    tablesItemsCount = getNumberOf("futures_client_holding")
+
+	for i = 0, tablesItemsCount, 1 do
+		
+		futures = getItem("futures_client_holding", i)
+
+		if futures ~= nil and futures.sec_code == ticker then 
+            LogWrite("Count positions for instrument "..ticker.." found!")
+            totalnet = math.abs(futures.totalnet)
+            LogWrite("Count active current positions = "..totalnet)
+			return totalnet
+		end
+		
+	end
+     
+    LogWrite("Count active current positions finish. Count positions for instrument "..ticker.." wasn't found!")
+    return totalnet
 end
 
 

@@ -273,7 +273,7 @@ function getParamFromFile(toolName, fileName)
 LogFile = getScriptPath().."\\".."bot_log.txt"
 
 
-ticker = "EuM4"
+ticker = "SiU4"
 
 function main()
     -- account_positions = getNumberOf("account_positions") 
@@ -350,16 +350,65 @@ InstrumentTypesFile = getScriptPath().."\\".."instrument type.txt"
 
 
 function countCurrentPositions(ticker)
-    LogWrite("Count active current positions")
+    LogWrite("Count active current positions start")
     local totalnet = 0
 
-    if getParamFromFile(ticker, InstrumentTypesFile) == "futures" then
-        totalnet = getItem("futures_client_holding", 0).totalnet
-    end
-    
-    LogWrite("Count active current positions = "..totalnet)
-    return math.abs(totalnet)
+    tablesItemsCount = getNumberOf("futures_client_holding")
+
+	for i = 0, tablesItemsCount, 1 do
+		
+		futures = getItem("futures_client_holding", i)
+
+		if futures ~= nil and futures.sec_code == ticker then 
+            LogWrite("Count positions for instrument "..ticker.." found!")
+            totalnet = math.abs(futures.totalnet)
+            LogWrite("Count active current positions = "..totalnet)
+			return totalnet
+		end
+		
+	end
+     
+    LogWrite("Count active current positions finish. Count positions for instrument "..ticker.." wasn't found!")
+    return totalnet
 end
+
+
+
+-- function countAllBuyOrders()
+--     LogWrite("Count active buy orders")
+--     num_orders = getNumberOf("orders")
+
+--     scan_max_limit = 100
+--     scan_limit = 0
+--     if num_orders > 100 then
+--         scan_limit = num_orders - scan_max_limit   
+--     end
+    
+-- 	num_active_buy_order = 0
+
+--     LogWrite("Start job at "..getInfoParam("SERVERTIME"))
+	
+-- 	for i = num_orders - 1, scan_limit, -1 do
+		
+-- 		myorder = getItem("orders", i)
+
+-- 		if bit.band(tonumber(myorder["flags"]), 1) > 0 and bit.band(tonumber(myorder["flags"]), 4) == 0 then 
+-- 			num_active_buy_order = num_active_buy_order + 1
+-- 		end
+		
+-- 		sleep(10)
+		
+-- 	end
+
+--     LogWrite("Finish job at "..getInfoParam("SERVERTIME"))
+	
+--     LogWrite("Количество активных заявок на покупку "..num_active_buy_order)
+
+--     return num_active_buy_order
+-- end
+
+
+
 
 
 

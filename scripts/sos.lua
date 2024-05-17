@@ -235,6 +235,71 @@ end
 
 
 
+function OrdersLimit(price_o, quant_o, operation_o) -- цена, количество и направление заявки
+    --случ число для номера заявки бота 
+    if tr_id == 0 then--id траназакции
+        tr_id = num_r..id_t..math.floor(os.clock()) % 100000 -- формир псевдослуч числа, id_t - последнее число сегодняшней даты для отлич дня сделок (тут не использ), num_r - номер робота
+    else
+        tr_id = tr_id + 1    --номер транзак заявки
+    end
+    
+    LogWrite("tr_id = "..tr_id)
+    LogWrite("price_o = "..price_o)
+
+    -- if operation_o == "S" then
+    --     SellOrder_ID = tr_id
+    --     SellOrder_num = 0
+    --     LogWrite("SellOrder_ID = "..SellOrder_ID)
+    -- else
+    --     BuyOrder_ID = tr_id
+    --     BuyOrder_num = 0
+    --     LogWrite("BuyOrder_ID = "..BuyOrder_ID)    
+    -- end
+
+    -- if tonumber(min_step_price) >= 1 then
+    --     price_o = math.ceil(price_o)
+    -- end
+
+    quant_o = math.ceil(quant_o)
+
+            local LimitOrder = {
+                                    ["ACTION"] = "NEW_ORDER",
+                                    ["account"] = depo,--счет
+                                    ["OPERATION"] = operation_o,--вид операции
+                                    ["CLASSCODE"] = class,--класс инструмента
+                                    ["SECCODE"] = ticker,--тикер инструмента
+                                    ["PRICE"] = tostring(price_o),--цена
+                                    ["QUANTITY"] = tostring(quant_o), --количество
+                                    ["TRANS_ID"] = tostring(tr_id),--id транзакции
+                                    ["TYPE"] = "L",--лимитная заявка
+                                    ["EXPIRY_DATE"] = "GTC",
+                                    ["CLIENT_CODE"] = tostring(ticker.."-"..num_r),--комментарий
+                                }
+
+            Err_Order = sendTransaction(LimitOrder)
+
+            if Err_Order ~= "" then
+                LogWrite("Ошибка отправки транзакции: "..Err_Order, "depo = "..depo.."operation_o = "..operation_o.."ticker = "..ticker.."class = "..class.."price_o = "..price_o.."quant_o = "..quant_o.."tr_id = "..tr_id.."CLIENT_CODE = "..ticker.."-"..num_r)
+            else
+                last_operation = operation_o
+                LogWrite("Транзакция отправлена: ".."depo = "..depo.."operation_o = "..operation_o.."ticker = "..ticker.."class = "..class.."price_o = "..price_o.."quant_o = "..quant_o.."tr_id = "..tr_id.."CLIENT_CODE = "..ticker.."-"..num_r)
+                sleep(10)
+            end
+   
+
+end
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -274,6 +339,16 @@ LogFile = getScriptPath().."\\".."bot_log.txt"
 
 
 ticker = "SiU4"
+class = "SPBFUT"
+
+depo = "NL0011100043"
+
+num_r = 25
+
+tr_id = num_r..math.floor(os.clock()) % 100000
+
+operation_o = "S"
+
 
 function main()
     -- account_positions = getNumberOf("account_positions") 
@@ -301,7 +376,11 @@ function main()
                     -- message(" totalnet = "..math.abs(totalnet))
 
 
---     securities = getNumberOf("securities")
+-- firms = getNumberOf("firms")
+-- LogWrite(" firms = "..firms)
+-- classes = getNumberOf("classes")
+-- LogWrite(" classes = "..classes)
+-- securities = getNumberOf("securities")
 -- LogWrite(" securities = "..securities)
 -- trade_accounts = getNumberOf("trade_accounts")
 -- LogWrite(" trade_accounts = "..trade_accounts)
@@ -339,14 +418,260 @@ function main()
 -- LogWrite(" ccp_holdings = "..ccp_holdings)
 -- rm_holdings = getNumberOf("rm_holdings")
 
-message(countCurrentPositions(ticker))
+-- countCurrentFirms()
+-- countCurrentClasses()
+-- countCurrentPositions(ticker)
+
+-- KillMFutureOrder()
+
+checkPriceDeviation()
+
+
+-- findStep()
+
+-- findToolParamTable(class, ticker)
 
 
 end
 
+-- ticker = "YNM4"
+-- class = "SPBFUT"
 
+-- tr_id = 0
+
+-- depo = "NL0011100043"
+
+-- num_r = 25
+
+-- operation_o == "S"
+
+
+-- a=getSecurityInfo("", «GZH5»).class_code -- узнать класс ТОЛЬКО  по инструменту !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+function KillMFutureOrder()
+    LogWrite("Find tool data start")
+
+    
+    bid=getParamEx(class,ticker, "BID").param_value
+    LogWrite("bid = "..bid)
+
+    class=getSecurityInfo("", ticker).class_code
+    LogWrite("class = "..class)
+
+
+    -- transaction = {
+
+    --     ACCOUNT=depo,
+    --     ACTION="NEW_ORDER",
+    --     TRANS_ID=tostring(tr_id),
+    --     CLASSCODE=class,
+    --     SECCODE=ticker,
+    --     CLIENT_CODE="1016",
+    --     TYPE="L",
+    --     OPERATION="S", -- тот же что и в таблице позиций
+    --     QUANTITY="3", -- то же что и в таблице позиций
+    --     PRICE=bid, -- продаем/покупаем по рыночной цене
+    --             }
+
+    -- Err_K = sendTransaction(transaction) 
+
+    -- if Err_Order ~= "" then
+    --     LogWrite("Ошибка отправки транзакции: "..Err_K)
+    -- else
+    --     LogWrite("EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE DESTRUCTION!!!!!!!!!!!!!!!!!!: "..Err_K)
+    -- end
+end
+
+
+
+function KillMFutureOrders()
+    LogWrite("Find tool data start")
+
+    -- local base_contract = getSecurityInfo(class, ticker).base_active_classcode
+
+    --  LogWrite("base_contract = "..base_contract)
+
+
+    KillAllFutures = {  
+        ACCOUNT = depo,
+        ACTION = "KILL_ALL_FUTURES_ORDERS",
+        TRANS_ID = tostring(tr_id),
+        OPERATION = operation_o,
+        BASE_CONTRACT = base_contract,
+        CLASSCODE = "SPBFUT"  
+                     }
+    Err_K = sendTransaction(KillAllFutures) 
+
+        if Err_Order ~= "" then
+            LogWrite("Ошибка отправки транзакции: "..Err_K)
+        else
+            LogWrite("EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE DESTRUCTION!!!!!!!!!!!!!!!!!!: "..Err_K)
+        end
+
+    LogWrite("Find tool data start")
+end
+
+
+
+function findStep()
+    min_step_price = tonumber(getParamEx(class, ticker, "SEC_PRICE_STEP").param_value) -- находим минимальный шаг фьючерса
+    LogWrite("min_step_price = "..min_step_price)
+    scale = tonumber(getParamEx(class, ticker, "SCALE").param_value) -- находим кол-во знаков после запятой
+    LogWrite("scale = "..scale)
+end
+
+
+function findToolDataTable(typeClassCode, tool)
+    LogWrite("Find tool data start")
+    local toolDataTable = getSecurityInfo(typeClassCode, tool)
+
+    LogWrite("code = "..toolDataTable.code)
+    LogWrite("name = "..toolDataTable.name)
+    LogWrite("short_name = "..toolDataTable.short_name)
+    LogWrite("class_code = "..toolDataTable.class_code)
+    LogWrite("class_name = "..toolDataTable.class_name)
+    LogWrite("face_value = "..toolDataTable.face_value)
+    LogWrite("face_unit = "..toolDataTable.face_unit)
+    LogWrite("scale = "..toolDataTable.scale)
+    LogWrite("mat_date = "..toolDataTable.mat_date)
+    LogWrite("lot_size = "..toolDataTable.lot_size)
+    LogWrite("isin_code = "..toolDataTable.isin_code)
+    LogWrite("min_price_step = "..toolDataTable.min_price_step)
+
+    LogWrite("Find tool data finish")
+     
+end
+
+-- Find tool method start
+-- code = SBER
+-- name = Sberbank Rossii PAO ao
+-- short_name = Sberbank
+-- class_code = QJSIM
+-- class_name = Shares 1-go level (emulyator)
+-- face_value = 3.0
+-- face_unit = SUR
+-- scale = 2
+-- mat_date = 0
+-- lot_size = 10
+-- isin_code = RU0009029540
+-- min_price_step = 0.01
+-- Find tool method finish
 
 InstrumentTypesFile = getScriptPath().."\\".."instrument type.txt"
+
+
+function countCurrentFirms()
+    LogWrite("Count firms start")
+    local totalnet = 0
+
+    firmsCount = getNumberOf("firms")
+
+    LogWrite("\nfirmsCount = "..firmsCount)
+
+	for i = 0, firmsCount, 1 do
+		
+		firms = getItem("firms", i)
+        LogWrite("firmid = "..firms.firmid)
+        LogWrite("firm_name = "..firms.firm_name)
+        LogWrite("status = "..firms.status)
+        LogWrite("exchange = "..firms.exchange)
+		
+	end
+     
+end
+
+
+
+function countCurrentClasses()
+    LogWrite("Count classes start")
+    local totalnet = 0
+
+    classesCount = getNumberOf("classes")
+
+    LogWrite("\nclassesCount = "..classesCount)
+
+	for i = 0, classesCount, 1 do
+		
+		firms = getItem("classes", i)
+        LogWrite("name = "..firms.name)
+        LogWrite("code = "..firms.code)
+        LogWrite("npars = "..firms.npars)
+        LogWrite("nsecs = "..firms.nsecs)
+		
+	end
+     
+end
+
+function checkPriceDeviation()
+    LogWrite("Check price deviation start")
+    local totalnet = 0
+    local currentPosition = 0
+    local avrposnprice = 0
+    local balanceCost = 0
+    local operation_o = ""
+
+    tablesItemsCount = getNumberOf("futures_client_holding")
+
+    LogWrite("\ntablesItemsCount = "..tablesItemsCount)
+
+	for i = 0, tablesItemsCount, 1 do
+		
+		futures = getItem("futures_client_holding", i)
+
+        -- LogWrite("avrposnprice"..futures.avrposnprice)
+
+		if futures ~= nil and futures.sec_code == ticker then 
+            LogWrite("Count positions for instrument "..ticker.." found!")
+
+            currentPosition = futures.totalnet
+            LogWrite("Sign position = "..currentPosition)
+
+            totalnet = math.abs(currentPosition)
+            LogWrite("Count active current positions = "..totalnet)
+
+            avrposnprice = futures.avrposnprice
+            LogWrite("avrposnprice = "..avrposnprice)
+
+            balanceCost = totalnet * avrposnprice
+            LogWrite("balanceCost = "..balanceCost)
+
+            bid=math.ceil(getParamEx(class, ticker, "BID").param_value)
+            LogWrite("bid = "..bid)
+
+            offer=math.ceil(getParamEx(class, ticker, "OFFER").param_value)
+            LogWrite("offer = "..offer)
+
+            operation_o = currentPosition > 0 and "S" or "B"
+            LogWrite("operation_o = "..operation_o)
+
+            if totalnet >= 1 and currentPosition > 0 then--and (balanceCost > (balanceCost - balanceCost * 0.05)) then
+                LogWrite("balanceCost = "..balanceCost)
+                OrdersLimit(bid, totalnet, operation_o)
+            elseif totalnet >= 1 and currentPosition < 0 then--and (balanceCost < (balanceCost + balanceCost * 0.05)) then
+                LogWrite("balanceCost = "..balanceCost)
+                OrdersLimit(offer, totalnet, operation_o)
+            end
+
+		end
+		
+	end
+     
+    LogWrite("Check price deviation ended")
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 function countCurrentPositions(ticker)
@@ -355,9 +680,31 @@ function countCurrentPositions(ticker)
 
     tablesItemsCount = getNumberOf("futures_client_holding")
 
+    LogWrite("\ntablesItemsCount = "..tablesItemsCount)
+
 	for i = 0, tablesItemsCount, 1 do
 		
 		futures = getItem("futures_client_holding", i)
+        LogWrite("firmid"..futures.firmid)
+        -- LogWrite("trdaccid"..futures.trdaccid)
+        -- LogWrite("sec_code"..futures.sec_code)
+        -- LogWrite("type"..futures.type)
+        -- LogWrite("startbuy"..futures.startbuy)
+        -- LogWrite("startsell"..futures.startsell)
+        -- LogWrite("startnet"..futures.startnet)
+        -- -- LogWrite("todaybuy"..futures.todaybuy)
+        -- -- LogWrite("todaysell"..future.todaysell)
+        -- LogWrite("totalnet"..futures.totalnet)
+        -- LogWrite("openbuys"..futures.openbuys)
+        -- LogWrite("opensells"..futures.opensells)
+        -- LogWrite("cbplused"..futures.cbplused)
+        -- LogWrite("cbplplanned"..futures.cbplplanned)
+        -- LogWrite("varmargin"..futures.varmargin)
+        -- LogWrite("avrposnprice"..futures.avrposnprice)
+        -- LogWrite("positionvalue"..futures.positionvalue)
+        -- LogWrite("real_varmargin"..futures.real_varmargin)
+        -- LogWrite("total_varmargin"..futures.total_varmargin)
+        -- LogWrite("futures.sec_code = "..futures.sec_code.." and actual is "..ticker)
 
 		if futures ~= nil and futures.sec_code == ticker then 
             LogWrite("Count positions for instrument "..ticker.." found!")
@@ -371,6 +718,18 @@ function countCurrentPositions(ticker)
     LogWrite("Count active current positions finish. Count positions for instrument "..ticker.." wasn't found!")
     return totalnet
 end
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

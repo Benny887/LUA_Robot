@@ -12,7 +12,7 @@ InstrumentTypesFile = getScriptPath().."\\".."instrument type.txt"
 
 current_spread = 0--текущий размер спреда инструмента
 ticker = ""--тикер инструмента
-min_step = 0--шаг
+min_step_price = 0 -- минимальный шаг фьючерса
 low_border_spread_to_trade = 0 -- мин спред при котором торгуем чтоб не жрать себя
 min_take = 0--тейк
 size_lot = 1-- максимальное количество заявок инструмента
@@ -22,8 +22,7 @@ orient_trade = 0--направление торговли: -1 -sell, 0- sell+buy
 stop_on = 0-- если один то стоп при 0
 start_bot = 0 --0 - бот не работает, 1 - бот работает
 is_run = true --переменная для вечного цикла
-min_step_price = 0 -- минимальный шаг фьючерса
-price_step = 0 -- цена шага фьючерса
+toolScale = 0
 pause_t = 0 --пауза в торгах
 traders_price = 0 --цена последней сделки
 last_sdelka = 0 -- 1 -тейк -1 - шаг
@@ -47,6 +46,9 @@ sellAppNumberToRemove = 0
 
 offer_value_to_set = 0
 bid_value_to_set = 0
+
+
+toolDataTable = nil
 
 
 
@@ -248,7 +250,7 @@ function CreateTable()
 
     --10я строка
     SetCell(t_id, 10, 1, tostring("Tool min step")); Color("Orange", t_id, 10, 1)
-    SetCell(t_id, 10, 2, tostring(min_step)); Color("Orange", t_id, 10, 2)
+    SetCell(t_id, 10, 2, tostring(min_step_price)); Color("Orange", t_id, 10, 2)
     SetCell(t_id, 10, 3, tostring(" ")); Color("Orange", t_id, 10, 3)
 
     --11я строка
@@ -335,7 +337,7 @@ function FillTable()
     end
 
     --10я строка
-    SetCell(t_id, 10, 2, tostring(min_step));
+    SetCell(t_id, 10, 2, tostring(min_step_price));
 
     --11я строка
     SetCell(t_id, 11, 2, tostring(low_border_spread_to_trade));
@@ -375,7 +377,7 @@ function TableMessage(t_id, msg, par1, par2) --ф-я обработки собы
 
         LogWrite("Нажата кнопка Spread limit +")
 
-        spread_limit = spread_limit + min_step
+        spread_limit = spread_limit + min_step_price
         SaveStart()
     end
 
@@ -384,7 +386,7 @@ function TableMessage(t_id, msg, par1, par2) --ф-я обработки собы
 
         LogWrite("Нажата кнопка Spread limit -")
 
-        spread_limit = spread_limit - min_step
+        spread_limit = spread_limit - min_step_price
         SaveStart()
     end
 
@@ -600,38 +602,58 @@ end
 
 function StartTradeSell(current_value)
     if is_run and start_bot == 1 then
-        if FindCurrentSpread(ticker, class) < spread_limit then
-            steeeeeep = tonumber(getParamEx(ticker, class, "SEC_PRICE_STEP").param_value)
-            message("Too low spread, steeeeeep = "..steeeeeep)
-            LogWrite("Too low spread for sell operation, step = "..steeeeeep)
-            return
-        end
 
-        if not isAcceptableSpread() then
-            message("Incceptable spread:= "..current_value)
-            LogWrite("Incceptable spread for sell operation: "..current_value)
-            return
-        end
+        CountSellOrdersByTool(ticker)
 
-        if current_value == 0 then
-            actual_offer_value1, bid_value, spred = GetStakanExtremumValues()
-            if actual_offer_value1 == 0 then
+        if current_spread <= spread_limit then
+            
+            actual_offer_value, actual_bid_value, spred = GetStakanExtremumValues()
+
+            if actual_offer_value == 0 then
                 message("Instrument is temporary inavailable. Bot is disabled!!!!")
                 start_bot = 0
                 return
             end
-            offer_value_to_set = math.ceil(actual_offer_value1 - min_step) --math.ceil( если с фьючерсами
+
+            if num_active_sell_order == 0 then
+                offer_value_to_set = toolScale == 0 and math.ceil(actual_offer_value + min_step_price) or (actual_offer_value + min_step_price)--math.ceil(
+                OrdersLimit(offer_value_to_set, 1, "S")
+            elseif num_active_sell_order == 1 and (actual_offer_value + min_step_price) ~= current_value then
+                offer_value_to_set = toolScale == 0 and math.ceil(actual_offer_value + min_step_price) or (actual_offer_value + min_step_price)--math.ceil(
+                KillLastOrderByType("S")
+                OrdersLimit(offer_value_to_set, 1, "S")    
+            end
+
+            LogWrite("Too low spread for sell operation, step = "..min_step_price)
+            return
+
+        end
+
+        -- if not isAcceptableSpread() then
+        --     message("Incceptable spread:= "..current_value)
+        --     LogWrite("Incceptable spread for sell operation: "..current_value)
+        --     return
+        -- end
+
+        if current_value == 0 and num_active_sell_order == 0 and current_spread <= spread_limit then
+            actual_offer_value, bid_value, spred = GetStakanExtremumValues()
+            if actual_offer_value == 0 then
+                message("Instrument is temporary inavailable. Bot is disabled!!!!")
+                start_bot = 0
+                return
+            end
+            offer_value_to_set = toolScale == 0 and math.ceil(actual_offer_value - min_step_price) or (actual_offer_value - min_step_price) --math.ceil( если с фьючерсами
             
             OrdersLimit(offer_value_to_set, 1, "S")
-            LogWrite("start trade, actual_offer_value ="..actual_offer_value1.." set best offer value = "..offer_value_to_set.." bid_value = "..bid_value.." spred ="..spred)
+            LogWrite("start trade, actual_offer_value ="..actual_offer_value.." set best offer value = "..offer_value_to_set.." bid_value = "..bid_value.." spred ="..spred)
             message("start trade, set best offer value = "..offer_value_to_set.." bid_value = "..bid_value.." spred ="..spred, 1)
         else --countCurrentPositions(ticker)  < max_pos  когда будем работать с позициями) (CountAllSellOrders(ticker) < size_lot - если нужно ограничение по заявкам )
             actual_offer_value, bid_value, spred = GetStakanExtremumValues()
             CountSellOrdersByTool(ticker)
             LogWrite("from trade : actual_offer_value = "..actual_offer_value.." bid_value = "..bid_value.." spred ="..spred.." current_value ="..current_value)--  num of positions "..countCurrentPositions(ticker).." < "..max_pos.."  при участи позиций
 
-            if actual_offer_value ~= 0 and (actual_offer_value ~= current_value) and is_run then
-                offer_value_to_set = math.ceil(actual_offer_value - min_step)--math.ceil(
+            if actual_offer_value ~= 0 and (actual_offer_value ~= current_value) and is_run or (num_active_sell_order == 0 and is_run) then
+                offer_value_to_set = toolScale == 0 and math.ceil(actual_offer_value - min_step_price) or (actual_offer_value - min_step_price)--math.ceil(
                 KillLastOrderByType("S")
                 OrdersLimit(offer_value_to_set, 1, "S")
                 message("bit current price: actual_offer_value "..actual_offer_value.." > current_value "..current_value.."offer less price : "..offer_value_to_set, 2)
@@ -640,7 +662,7 @@ function StartTradeSell(current_value)
                 message("actual_offer_value is nil", 3)
                 start_bot = 0
             elseif current_value ~= 0 then
-                message("actual_offer_value = "..actual_offer_value.." is equals or greater than current_value = "..current_value.."countCurrentPositions = "..countCurrentPositions(ticker), 3)
+                message("actual_offer_value = "..actual_offer_value.." is equals or greater than current_value = "..current_value.." countCurrentPositions = "..countCurrentPositions(ticker), 3)
             end
         -- else
         --     message("Positions limit - "..max_pos.." is reached! ")    
@@ -654,37 +676,56 @@ end
 
 function StartTradeBuy(current_value)
     if is_run and start_bot == 1 then
-        if current_spread < spread_limit then
-            steeeeeep = tonumber(getParamEx(ticker, class, "SEC_PRICE_STEP").param_value)
-            LogWrite("Too low spread for buy operation, step = "..steeeeeep)
-            message("Too low spread, steeeeeep = "..steeeeeep)
-            return
-        end
 
-        if not isAcceptableSpread() then
-            message("Incceptable spread : "..current_value)
-            LogWrite("Incceptable spread for buy operation: "..current_value)
-            return
-        end
+        CountBuyOrdersByTool(ticker)
 
-        if current_value == 0 then
-            actual_bid_value, actual_bid_value, spred = GetStakanExtremumValues()
+        if current_spread <= spread_limit then
+
+            actual_offer_value, actual_bid_value, spred = GetStakanExtremumValues()
+
             if actual_bid_value == 0 then
                 message("Instrument is temporary inavailable. Bot is disabled!!!!")
                 start_bot = 0
                 return
             end
-            bid_value_to_set = math.ceil(actual_bid_value + min_step)--math.ceil(
+            
+            if num_active_buy_order == 0 then --если спред слишком мал для торговли и последняя акция продана то выставляем цену ниже самой последней
+                bid_value_to_set = toolScale == 0 and math.ceil(actual_bid_value - min_step_price) or (actual_bid_value - min_step_price)--math.ceil(
+                OrdersLimit(bid_value_to_set, 1, "B")
+            elseif num_active_buy_order == 1 and (actual_bid_value - min_step_price) ~= current_value then
+                bid_value_to_set = toolScale == 0 and math.ceil(actual_bid_value - min_step_price) or (actual_bid_value - min_step_price)--math.ceil(
+                KillLastOrderByType("B")
+                OrdersLimit(bid_value_to_set, 1, "B")
+            end
+
+            LogWrite("Too low spread for buy operation, step = "..min_step_price)
+            return
+        end
+
+        -- if not isAcceptableSpread() then
+        --     message("Incceptable spread : "..current_value)
+        --     LogWrite("Incceptable spread for buy operation: "..current_value)
+        --     return
+        -- end
+
+        if current_value == 0 and num_active_buy_order == 0 and current_spread <= spread_limit then
+            actual_offer_value, actual_bid_value, spred = GetStakanExtremumValues()
+            if actual_bid_value == 0 then
+                message("Instrument is temporary inavailable. Bot is disabled!!!!")
+                start_bot = 0
+                return
+            end
+            bid_value_to_set = toolScale == 0 and math.ceil(actual_bid_value + min_step_price) or (actual_bid_value + min_step_price)--math.ceil(
             OrdersLimit(bid_value_to_set, 1, "B")
             LogWrite("start trade, actual_bid_value ="..actual_bid_value.." set best bid value = "..bid_value_to_set.." bid_value = "..bid_value.." spred ="..spred)
             message("start trade, set best bid value = "..bid_value_to_set.." bid_value = "..bid_value.." spred ="..spred, 1)
         else -- (countCurrentPositions(ticker) < max_pos  когда будем работать с позициями) (CountAllBuyOrders(ticker) < size_lot then - если нужно ограничение по заявкам)
             actual_offer_value, actual_bid_value, spred = GetStakanExtremumValues()
-            CountBuyOrdersByTool(ticker)
+            -- CountBuyOrdersByTool(ticker)
             LogWrite("from trade : actual_offer_value = "..actual_offer_value.." actual_bid_value = "..actual_bid_value.." spred ="..spred.." current_value ="..current_value) --num of positions "..countCurrentPositions(ticker).." < "..max_pos..", - при учстии позиций
 
-            if actual_bid_value ~= 0 and (actual_bid_value ~= current_value) and is_run then 
-                bid_value_to_set = math.ceil(actual_bid_value + min_step)--math.ceil(
+            if (actual_bid_value ~= 0 and (actual_bid_value ~= current_value) and is_run) or (num_active_buy_order == 0 and is_run) then
+                bid_value_to_set = toolScale == 0 and math.ceil(actual_bid_value + min_step_price) or (actual_bid_value + min_step_price)--math.ceil(
                 KillLastOrderByType("B")
                 OrdersLimit(bid_value_to_set, 1, "B")
                 message("bit current price: actual_bid_value "..actual_bid_value.." > current_value "..current_value.."bid greater price : "..bid_value_to_set, 2)
@@ -694,7 +735,7 @@ function StartTradeBuy(current_value)
                 start_bot = 0
             elseif current_value ~= 0 then
 
-                message("actual_bid_value = "..actual_bid_value.."is equals or less than current_value = "..current_value.."countCurrentPositions = "..countCurrentPositions(ticker), 3)
+                message("actual_bid_value = "..actual_bid_value.."is equals or less than current_value = "..current_value.." countCurrentPositions = "..countCurrentPositions(ticker), 3)
             end
         -- else
         --     message("Positions limit - "..max_pos.." is reached! ")    
@@ -1183,6 +1224,12 @@ end
 -- end
 
 
+    
+function findToolDataTable(typeClassCode, tool)
+    LogWrite("Find tool data start")
+    return getSecurityInfo(typeClassCode, tool)
+end
+
 
 function main()
     LogWrite("Бот запущен")
@@ -1190,17 +1237,18 @@ function main()
     ReadTable()--получ данных из стартов файла
     CreateTable()--созд таблицу
 
+    class = getParamFromFile(ticker, ClassesFile)
+    
+    toolDataTable = findToolDataTable(class, ticker) -- вся инфа о классе инструмента
 
-    min_step_price = tonumber(getParamEx(class, ticker, "SEC_PRICE_STEP").param_value) -- находим минимальный шаг фьючерса
+
+    min_step_price = toolDataTable.min_price_step -- находим минимальный шаг фьючерса
+    toolScale = toolDataTable.scale --значимые цифры после зпт
 
     LogWrite("min_step_price = "..min_step_price)
 
-    price_step=tonumber(getParamEx(class, ticker, "STEPPRICE").param_value) -- находим цену шага фьючерса
-    LogWrite("price_step = "..price_step)
-
-    min_step = tonumber((getParamFromFile(ticker, ToolsFile):gsub(",", ".")))
-    low_border_spread_to_trade = min_step * 2
-    class = getParamFromFile(ticker, ClassesFile)
+    low_border_spread_to_trade = min_step_price * 2
+    
 
     while is_run == true do --основн цикл скрипта
         FillTable() -- зфполнение экранной таблицы
@@ -1223,7 +1271,7 @@ function main()
             is_run = false
         end
 
-        sleep(1000) --мс
+        sleep(50) --мс
     end
 end
 

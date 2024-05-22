@@ -338,8 +338,8 @@ function getParamFromFile(toolName, fileName)
 LogFile = getScriptPath().."\\".."bot_log.txt"
 
 
-ticker = "SiU4"
-class = "SPBFUT"
+ticker = "SBERP"
+class = "QJSIM"
 
 depo = "NL0011100043"
 
@@ -348,6 +348,8 @@ num_r = 25
 tr_id = num_r..math.floor(os.clock()) % 100000
 
 operation_o = "S"
+
+alarmRatio = 0.95
 
 
 function main()
@@ -375,6 +377,7 @@ function main()
                     -- totalnet = getItem("futures_client_holding", 0).totalnet -- 	currentpos
                     -- message(" totalnet = "..math.abs(totalnet))
 
+                    
 
 -- firms = getNumberOf("firms")
 -- LogWrite(" firms = "..firms)
@@ -382,24 +385,45 @@ function main()
 -- LogWrite(" classes = "..classes)
 -- securities = getNumberOf("securities")
 -- LogWrite(" securities = "..securities)
--- trade_accounts = getNumberOf("trade_accounts")
--- LogWrite(" trade_accounts = "..trade_accounts)
+
 -- client_codes = getNumberOf("client_codes")
 -- LogWrite(" client_codes = "..client_codes)
+
 -- all_trades = getNumberOf("all_trades")
 -- LogWrite(" all_trades = "..all_trades)
+
 -- account_positions = getNumberOf("account_positions")
 -- LogWrite(" account_positions = "..account_positions)
+
 -- orders = getNumberOf("orders")
 -- LogWrite(" orders = "..orders)
+
 -- futures_client_holding = getNumberOf("futures_client_holding")
 -- LogWrite(" futures_client_holding = "..futures_client_holding)
 -- futures_client_limits = getNumberOf("futures_client_limits")
 -- LogWrite(" futures_client_limits = "..futures_client_limits)
 -- money_limits = getNumberOf("money_limits")
 -- LogWrite(" money_limits = "..money_limits)
+
 -- depo_limits = getNumberOf("depo_limits")
 -- LogWrite(" depo_limits = "..depo_limits)
+
+
+
+-- LogWrite("\n")
+-- for i = 0, depo_limits, 1 do
+		
+--     acc = getItem("depo_limits", i)
+
+
+--     LogWrite(getParamEx(class, acc.sec_code, "BID").param_value)
+--     LogWrite(getParamEx(class, acc.sec_code, "OFFER").param_value)
+--     LogWrite("currentbal = "..acc.currentbal)
+--     LogWrite("wa_position_price = "..acc.wa_position_price)
+
+--     LogWrite("\n")
+-- end
+
 -- trades = getNumberOf("trades")
 -- LogWrite(" trades = "..trades)
 -- stop_orders = getNumberOf("stop_orders")
@@ -420,11 +444,12 @@ function main()
 
 -- countCurrentFirms()
 -- countCurrentClasses()
--- countCurrentPositions(ticker)
+-- findCurPosFutures(ticker)
 
 -- KillMFutureOrder()
 
-checkPriceDeviation()
+-- checkFuturePriceDeviationAndRem()
+checkFondsPriceDeviationAndRem()
 
 
 -- findStep()
@@ -447,6 +472,10 @@ end
 
 
 -- a=getSecurityInfo("", «GZH5»).class_code -- узнать класс ТОЛЬКО  по инструменту !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+--string.format("%.2f", numb) - урезать нули !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
 function KillMFutureOrder()
@@ -603,13 +632,50 @@ function countCurrentClasses()
      
 end
 
-function checkPriceDeviation()
+
+
+-- function OnTransReply(trn)
+-- 	message(string.rep("-",25))
+-- 	message(title1.." trn_id="..tostring(trn.trans_id).." / status="..trn.status.." / order_num="..trn.order_num)
+-- 	message(title1.." price="..trn.price.." / quantity="..trn.quantity.." / brokerref="..trn.brokerref)
+-- 	message(title1.." result_msg="..trn.result_msg)
+-- 	time2 = os.clock()
+-- 	message(title1.." âðåìÿ îòêëèêà "..(time2-time1).." ñåê.")
+-- end
+
+
+function OnTransReply(trn)
+
+    oper_status= trn.status
+    LogWrite(trn.status)
+    if oper_status ~= 3 then
+        LogWrite("slp swt...")
+        waitTrans(trn, oper_status)
+    else
+        LogWrite("threeeeeeeeeeeeeeeeeeeeeee")
+    end
+    
+end
+
+function waitTrans(table, status)
+
+    while status ~= 3 do
+        message("Sleeeeeep sweeeeeeeeeeeeeeeeeet...")
+        LogWrite("Sleeeeeep sweeeeeeeeeeeeeeeeeet...")
+        sleep(1000)
+        checkFondsPriceDeviationAndRem()
+        status = table.status
+    end 
+
+end
+
+
+--УДАЛЕНИЕ ПОЗИЦИЙ И ФЬЮЧЕРСОВ
+
+
+
+function checkFuturePriceDeviationAndRem()
     LogWrite("Check price deviation start")
-    local totalnet = 0
-    local currentPosition = 0
-    local avrposnprice = 0
-    local balanceCost = 0
-    local operation_o = ""
 
     tablesItemsCount = getNumberOf("futures_client_holding")
 
@@ -619,37 +685,28 @@ function checkPriceDeviation()
 		
 		futures = getItem("futures_client_holding", i)
 
-        -- LogWrite("avrposnprice"..futures.avrposnprice)
-
-		if futures ~= nil and futures.sec_code == ticker then 
+		if futures ~= nil and futures.sec_code == ticker and math.abs(futures.totalnet) > 1 then 
             LogWrite("Count positions for instrument "..ticker.." found!")
 
-            currentPosition = futures.totalnet
-            LogWrite("Sign position = "..currentPosition)
+            curPosSign = futures.totalnet
 
-            totalnet = math.abs(currentPosition)
-            LogWrite("Count active current positions = "..totalnet)
+            totalnet = math.abs(curPosSign)
 
             avrposnprice = futures.avrposnprice
-            LogWrite("avrposnprice = "..avrposnprice)
-
-            balanceCost = totalnet * avrposnprice
-            LogWrite("balanceCost = "..balanceCost)
 
             bid=math.ceil(getParamEx(class, ticker, "BID").param_value)
-            LogWrite("bid = "..bid)
 
             offer=math.ceil(getParamEx(class, ticker, "OFFER").param_value)
-            LogWrite("offer = "..offer)
 
-            operation_o = currentPosition > 0 and "S" or "B"
-            LogWrite("operation_o = "..operation_o)
+            operation_o = curPosSign > 0 and "S" or "B"
 
-            if totalnet >= 1 and currentPosition > 0 then--and (balanceCost > (balanceCost - balanceCost * 0.05)) then
-                LogWrite("balanceCost = "..balanceCost)
+            LogWrite("Sign position = "..curPosSign.."Count futures current positions = "..totalnet.." avrposnprice = "..avrposnprice.."bid = "..bid.." offer = "..offer.." operation_o = "..operation_o)
+
+            if totalnet >= 1 and curPosSign > 0 and operation_o == "S" then --and wa_position_price * alarmRatio <= bid then) then
+                LogWrite("bid = "..bid)
                 OrdersLimit(bid, totalnet, operation_o)
-            elseif totalnet >= 1 and currentPosition < 0 then--and (balanceCost < (balanceCost + balanceCost * 0.05)) then
-                LogWrite("balanceCost = "..balanceCost)
+            elseif totalnet >= 1 and curPosSign < 0 and operation_o == "B" then --and wa_position_price * alarmRatio >= bid then
+                LogWrite("offer = "..offer)
                 OrdersLimit(offer, totalnet, operation_o)
             end
 
@@ -662,6 +719,169 @@ end
 
 
 
+-- function checkFuturePriceDeviationAndRem()
+--     LogWrite("Check future price deviation start")
+
+--     tablesItemsCount = getNumberOf("futures_client_holding")
+
+-- 	for i = 0, tablesItemsCount, 1 do
+		
+-- 		futures = getItem("futures_client_holding", i)
+
+-- 		if futures ~= nil and futures.sec_code == ticker and math.abs(futures.totalnet) > 10 then  
+--             LogWrite("Count positions for instrument "..ticker.."  found and more than 10!")
+
+--             local curPosSign = futures.totalnet
+
+--             local totalnet = math.abs(curPosSign)
+
+--             local avrposnprice = futures.avrposnprice
+
+--             local bid=tonumber(math.ceil(getParamEx(class, ticker, "BID").param_value))
+
+--             local offer=tonumber(math.ceil(getParamEx(class, ticker, "OFFER").param_value))
+
+--             operation_o = curPosSign > 0 and "S" or "B"
+--             LogWrite("Sign position = "..curPosSign.." Count future current positions = "..totalnet.." avrposnprice = "..avrposnprice.." bid = "..bid.." offer = "..offer.." operation_o = "..operation_o)
+
+--             LogWrite("for S = "..(bid - avrposnprice).." > "..(bid * 0.05))
+--             LogWrite("for B = "..(avrposnprice - offer).." > "..(offer * 0.05))
+--             if operation_o == "S" then--and (bid - avrposnprice > (bid * 0.05)) then
+--                 LogWrite("bid = "..bid)
+--                 OrdersLimit(bid, totalnet, operation_o)
+--             elseif operation_o == "B" then --and (avrposnprice - offer > (offer * 0.05)) then
+--                 LogWrite("offer = "..offer)
+--                 OrdersLimit(offer, totalnet, operation_o)
+--             end
+-- 		end	
+-- 	end
+     
+--     LogWrite("Check future price deviation finish")
+-- end
+
+
+
+-- function checkFondsPriceDeviationAndRem()
+--     LogWrite("Check price deviation start")
+--     local totalnet = 0
+--     local currentPosition = 0
+--     local avrposnprice = 0
+--     local balanceCost = 0
+--     local operation_o = ""
+
+
+--     depo_limits = getNumberOf("depo_limits")
+--     LogWrite(" depo_limits = "..depo_limits)
+    
+    
+    
+--     -- LogWrite("\n")
+--     -- for i = 0, depo_limits, 1 do
+            
+--     --     acc = getItem("depo_limits", i)
+    
+    
+--     --     LogWrite(getParamEx(class, acc.sec_code, "BID").param_value)
+--     --     LogWrite(getParamEx(class, acc.sec_code, "OFFER").param_value)
+--     --     LogWrite("currentbal = "..acc.currentbal)
+--     --     LogWrite("wa_position_price = "..acc.wa_position_price)
+    
+--     --     LogWrite("\n")
+--     -- end
+
+--     LogWrite(getItem("depo_limits", 0).sec_code)
+
+
+-- 	for i = 0, depo_limits, 1 do
+--         LogWrite(" go  i= "..i)
+		
+-- 		fonds = getItem("depo_limits", i)
+
+--         -- LogWrite(" fonds = "..fonds ~= nil)
+
+-- 		if fonds ~= nil and fonds.sec_code == ticker then 
+--             LogWrite("Count positions for instrument "..ticker.." found!")
+
+--             currentPos = fonds.currentbal
+--             LogWrite("Sign position = "..currentPos)
+
+--             currentbal = math.abs(currentPos)
+--             LogWrite("Count active current positions fonds = "..currentPos)
+
+--             wa_position_price = fonds.wa_position_price
+--             LogWrite("wa_position_price = "..wa_position_price)
+
+--             bid=tonumber(getParamEx(class, ticker, "BID").param_value)
+--             LogWrite("bid = "..bid)
+
+--             offer=tonumber(getParamEx(class, ticker, "OFFER").param_value)
+--             LogWrite("offer = "..offer)
+
+--             operation_o = currentPos > 0 and "S" or "B"
+--             LogWrite("operation_o = "..operation_o)
+
+--             LogWrite("for S = "..(bid - wa_position_price).." > "..(bid * 0.05))
+--             LogWrite("for B = "..(wa_position_price - offer).." > "..(offer * 0.05))
+--             if currentbal >= 1 and currentPos > 0 and operation_o == "S" then --and (bid - wa_position_price > (bid * 0.05)) then
+--                 LogWrite("bid = "..bid)
+--                 OrdersLimit(bid, currentbal, operation_o)
+--             elseif currentbal >= 1 and currentPos < 0 and operation_o == "B" then --and (wa_position_price - offer > (offer * 0.05)) then
+--                 LogWrite("offer = "..offer)
+--                 OrdersLimit(offer, currentbal, operation_o)
+--             end
+
+-- 		end
+		
+-- 	end
+     
+--     LogWrite("Check price deviation ended")
+-- end
+
+
+
+
+
+
+function checkFondsPriceDeviationAndRem()
+    LogWrite("Check fond price deviation start")
+
+    depo_limits = getNumberOf("depo_limits")
+    
+	for i = 0, depo_limits, 1 do
+		
+		fonds = getItem("depo_limits", i)
+
+		if fonds ~= nil and fonds.sec_code == ticker and math.abs(fonds.currentbal) > 1 then 
+            LogWrite("Count positions for instrument "..ticker.." found and more than 10!")
+
+            local curPosSign = fonds.currentbal
+
+            local currentbal = math.abs(curPosSign)
+
+            local wa_position_price = fonds.wa_position_price
+
+            local bid=tonumber(getParamEx(class, ticker, "BID").param_value)
+
+            local offer=tonumber(getParamEx(class, ticker, "OFFER").param_value)
+
+            operation_o = curPosSign > 0 and "S" or "B"
+            
+            LogWrite("Sign position = "..curPosSign.."Count fonds current positions = "..currentbal.." wa_position_price = "..wa_position_price.."bid = "..bid.." offer = "..offer.." operation_o = "..operation_o)
+
+            LogWrite("for S = "..(bid - wa_position_price).." > "..(bid * 0.05))
+            LogWrite("for B = "..(wa_position_price - offer).." > "..(offer * 0.05))
+            if operation_o == "S" then --and wa_position_price * alarmRatio <= bid then
+                LogWrite("bid = "..bid)
+                OrdersLimit(bid, currentbal, operation_o)
+            elseif operation_o == "B" then --and wa_position_price * alarmRatio <= bid then
+                LogWrite("offer = "..offer)
+                OrdersLimit(offer, currentbal, operation_o)
+            end
+		end
+	end
+     
+    LogWrite("Check fond price deviation finish")
+end
 
 
 
@@ -670,11 +890,7 @@ end
 
 
 
-
-
-
-
-function countCurrentPositions(ticker)
+function findCurPosFutures(ticker)
     LogWrite("Count active current positions start")
     local totalnet = 0
 
@@ -685,7 +901,7 @@ function countCurrentPositions(ticker)
 	for i = 0, tablesItemsCount, 1 do
 		
 		futures = getItem("futures_client_holding", i)
-        LogWrite("firmid"..futures.firmid)
+        -- LogWrite("firmid"..futures.firmid)
         -- LogWrite("trdaccid"..futures.trdaccid)
         -- LogWrite("sec_code"..futures.sec_code)
         -- LogWrite("type"..futures.type)

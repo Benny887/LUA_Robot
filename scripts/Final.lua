@@ -635,7 +635,7 @@ function StartTradeSell(current_value)
         --     return
         -- end
 
-        if current_value == 0 and num_active_sell_order == 0 and current_spread <= spread_limit then
+        if current_value == 0 and num_active_sell_order == 0 then
             actual_offer_value, bid_value, spred = GetStakanExtremumValues()
             if actual_offer_value == 0 then
                 message("Instrument is temporary inavailable. Bot is disabled!!!!")
@@ -708,7 +708,7 @@ function StartTradeBuy(current_value)
         --     return
         -- end
 
-        if current_value == 0 and num_active_buy_order == 0 and current_spread <= spread_limit then
+        if current_value == 0 and num_active_buy_order == 0 then
             actual_offer_value, actual_bid_value, spred = GetStakanExtremumValues()
             if actual_bid_value == 0 then
                 message("Instrument is temporary inavailable. Bot is disabled!!!!")
@@ -1229,6 +1229,15 @@ function findToolDataTable(typeClassCode, tool)
     LogWrite("Find tool data start")
     return getSecurityInfo(typeClassCode, tool)
 end
+
+-- function OnTransReply(trn)
+
+--     if trn.status ~= 3 then
+--         message("Sleeeeeep sweeeeeeeeeeeeeeeeeet...")
+--         sleep(1000)
+--     end    
+    
+-- end
 
 
 function main()

@@ -1,7 +1,3 @@
-Tool           : BANEP
-Spread limit   : 0.03
-Direction      : 0
-Size of lot    : 1
-Step           : 0.02
-Take           : 0.03
-Max of lots    : 2
+Tool           : MGNT
+Spread limit   : 0.5
+Direction      : -1

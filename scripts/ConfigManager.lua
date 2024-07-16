@@ -1,6 +1,6 @@
 local ConfigManager = {}
 
-local PROPERTIES = {
+PROPERTIES = {
 	CURRENT_SPREAD = 'current_spread',
     TICKER = 'ticker',--тикер инструмента
     MIN_STEP_PRICE = 'min_step_price', -- минимальный шаг фьючерса
@@ -59,8 +59,8 @@ BUNDLE[PROPERTIES.NUM_ACTIVE_BUY_ORDER] = 0
 BUNDLE[PROPERTIES.BUY_APP_NUMBER_TO_REMOVE] = 0
 BUNDLE[PROPERTIES.SELL_APP_NUMBER_TO_REMOVE] = 0
 
--- print(PROPERTIES.IS_RUN)
--- print(BUNDLE[PROPERTIES.IS_RUN])
+print(PROPERTIES.IS_RUN)
+print(BUNDLE[PROPERTIES.IS_RUN])
 
 function ConfigManager.loadConfigFromFile(configFilePath)
 	local file_with_initial_data = io.open(configFilePath, "r")
@@ -75,31 +75,39 @@ function ConfigManager.loadConfigFromFile(configFilePath)
         Comment, spread_limit = file_with_initial_data:read(16, "l")
         spread_limit = string.gsub(spread_limit, "%s+", "")
         spread_limit = tonumber(spread_limit)
-        
-        Log("spread_limit = "..spread_limit)
+        BUNDLE[PROPERTIES.SPRREAD_LIMIT] = spread_limit
+        Log("spread_limit = "..BUNDLE[PROPERTIES.SPRREAD_LIMIT])
 
+        local orient_trade
         Comment, orient_trade = file_with_initial_data:read(16, "l")
         orient_trade = string.gsub(orient_trade, "%s+", "")
         orient_trade = tonumber(orient_trade)
-        Log("orient_trade = "..orient_trade)
+        BUNDLE[PROPERTIES.ORIENT_TRADE] = orient_trade
+        Log("orient_trade = "..BUNDLE[PROPERTIES.ORIENT_TRADE])
 
         file_with_initial_data:close()
     else
         --  сохран тек данн в файл   
-     SaveCurrentConfigState()
+     SaveCurrentConfigState(configFilePath)
     end
 end
 
-function ConfigManager.updateProperty(propertyName)
+function SaveCurrentConfigState(configFilePath)-- сох текущ настройки торговли
+    local f = io.open(configFilePath, "w")-- Режим перезаписи
 
+    f:write("Tool           : "..BUNDLE[PROPERTIES.TICKER].."\n")
+    f:write("Spread limit   : "..BUNDLE[PROPERTIES.SPRREAD_LIMIT].."\n")
+    f:write("Direction      : "..BUNDLE[PROPERTIES.ORIENT_TRADE].."\n")
+
+    f:close()
 end
 
-function ConfigManager.updateProperties(properties)
-
+function ConfigManager.getProperty(propertyName)
+    return BUNDLE[propertyName]
 end
 
-function ConfigManager.reconfigureBot()
-
+function ConfigManager.setProperty(propertyName, propertyValue)
+	BUNDLE[propertyName] = propertyValue
 end
 
 return ConfigManager

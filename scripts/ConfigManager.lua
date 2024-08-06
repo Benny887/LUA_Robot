@@ -108,6 +108,12 @@ end
 
 function ConfigManager.setProperty(propertyName, propertyValue)
 	BUNDLE[propertyName] = propertyValue
+    reloadPropertiesForEachModule()
+end
+
+function reloadPropertiesForEachModule()
+    local mainModule = require("Main")
+    mainModule.reloadConfig()
 end
 
 return ConfigManager

@@ -47,6 +47,7 @@ toolDataTable = nil
 
 alarmRatio = 0.99 --для просмотра не ушла ли цена вверх или вниз на 0.05
 
+local configManager = require("ConfigManager")
 
 
 function split(partOfWord, inputString, separator)
@@ -165,7 +166,8 @@ function Color(color, id, line, column)--раскрасить таблицу
 end
 
 function CreateTable()
-    t_id = AllocTable() --получ доступ id для создания
+    local t_id = AllocTable() --получ доступ id для создания
+    configManager.setProperty(PROPERTIES.T_ID, t_id)
     AddColumn(t_id, 1, name_bot, true, QTABLE_INT_TYPE, 17)--name_bot - сеточный бот
     AddColumn(t_id, 2, ticker, true, QTABLE_INT_TYPE, 15)--EDH4
     AddColumn(t_id, 3, version, true, QTABLE_INT_TYPE, 5)--version
@@ -209,9 +211,9 @@ end
 
 
 function FillTable()
-
+    local t_id = configManager.getProperty(PROPERTIES.T_ID)
     --1я строка
-    if start_bot == 0 then
+    if configManager.getProperty(configManager.PROPERTIES.START_BOT) == 0 then
         SetCell(t_id, 1, 1, tostring("Start")); Color("Blue", t_id, 1, 1)
         SetCell(t_id, 1, 2, tostring("Doesn't work")); Color("White-Red", t_id, 1, 2)
     else
@@ -221,7 +223,8 @@ function FillTable()
     
 
     --2я строка
-    current_spread = FindCurrentSpread(ticker, class)
+    local ticker = configManager.getProperty(PROPERTIES.TICKER)
+    local current_spread = FindCurrentSpread(ticker, class)
     if (current_spread ~= nil) then
         SetCell(t_id, 2, 2, tostring(current_spread)); Color("Yellow", t_id, 2, 2)
     else
@@ -230,9 +233,11 @@ function FillTable()
     
 
     --3я строка
-    SetCell(t_id, 3, 2, tostring(spread_limit));
+    local spread_limit = configManager.getProperty(PROPERTIES.SPRREAD_LIMIT)
+    SetCell(t_id, 3, 2, tostring(spread_limit))
 
     --4я строка
+    local orient_trade = configManager.getProperty(PROPERTIES.ORIENT_TRADE)
     if orient_trade == -1 then
         SetCell(t_id, 4, 2, tostring("sell      ")); Color("Red", t_id, 4, 2)
     elseif orient_trade == 0 then
@@ -242,7 +247,8 @@ function FillTable()
     end
 
     --5я строка
-    SetCell(t_id, 5, 2, tostring(min_step_price));
+    local min_step_price = configManager.getProperty(PROPERTIES.MIN_STEP_PRICE)
+    SetCell(t_id, 5, 2, tostring(min_step_price))
 
     --6я строка
     SetCell(t_id, 6, 2, tostring(class));
@@ -254,11 +260,93 @@ end
 function TableMessage(t_id, msg, par1, par2) --ф-я обработки событий в таблице (табл, сообщ, стр, столб)
     
     --нажата кнопка Старт
+    local start_bot = configManager.getProperty(PROPERTIES.START_BOT)
+    local pause_t = configManager.getProperty(PROPERTIES.PAUSE_T)
+    if msg == QTABLE_LBUTTONDOWN then
+        return
+    end
+
+    
+    if par1 == 1 and par2 == 2 and start_bot == 1 then
+
+        Log("Нажата кнопка Stop")
+
+        start_bot = 0
+        -- StopTrade()
+    end
+
+    if start_bot == 0 then
+        if par1 == 1 and par2 == 1 and pause_t == 0 then
+
+        Log("Нажата кнопка Start")
+
+            configManager.setProperty(PROPERTIES.START_BOT, 1)
+            -- while start_bot == 1 do
+            --     StartTradeSell(offer_value_to_set)
+            --     StartTradeBuy(bid_value_to_set)
+            --     sleep(1000)
+            -- end
+        end
+
+        if par1 == 3 and par2 == 2 then
+
+            Log("Нажата кнопка Spread limit +")
+
+            spread_limit = spread_limit + min_step_price
+            SaveCurrentConfigState()
+        end
+
+        if par1 == 3 and par2 == 3 then
+            Log("Нажата кнопка Spread limit -")
+
+            spread_limit = spread_limit - min_step_price
+            SaveCurrentConfigState()
+        end
+
+        if par1 == 4 and par2 == 2 then
+            Log("Нажата кнопка Direction +")
+
+            orient_trade = orient_trade + 1
+            if orient_trade == 2 then
+                orient_trade = -1
+            end
+
+            SaveCurrentConfigState()
+        end
+
+        if par1 == 4 and par2 == 3 then
+            Log("Нажата кнопка Direction -")
+
+            orient_trade = orient_trade - 1
+            if orient_trade == -2 then
+                orient_trade = 1
+            end
+
+            SaveCurrentConfigState()
+        end
+
+        if par1 == 9 and par2 == 2 then
+
+            Log("Нажата кнопка Stop no 0")
+            
+            if stop_on == 0 then
+                stop_on = 1
+            else 
+                stop_on = 0
+            end
+        end
+
+    end
+
+    ----------------------------
+
+
+
     if msg == QTABLE_LBUTTONDOWN and par1 == 1 and par2 == 1 and start_bot == 0 and pause_t == 0 then
 
         Log("Нажата кнопка Start")
 
-            start_bot = 1
+            configManager.setProperty(PROPERTIES.START_BOT, 1)
             -- while start_bot == 1 do
             --     StartTradeSell(offer_value_to_set)
             --     StartTradeBuy(bid_value_to_set)
@@ -339,6 +427,7 @@ function FindCurrentSpread(sec_code, class_code) --находит последн
     if active_spread == nil then
         message("Error while getting current spread")
     end
+    configManager.setProperty(PROPERTIES.CURRENT_SPREAD, active_spread)
     return active_spread
 end
 
@@ -1096,5 +1185,7 @@ function main()
     end
 end
 
-
+function reloadConfig()
+    -- TODO
+end
 
